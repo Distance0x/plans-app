@@ -7,11 +7,11 @@ export interface ElectronAPI {
     search: (query: string) => Promise<any[]>;
   };
   timer: {
-    start: (taskId?: string) => Promise<void>;
-    pause: () => Promise<void>;
-    resume: () => Promise<void>;
-    reset: () => Promise<void>;
-    skip: () => Promise<void>;
+    start: (taskId?: string) => Promise<any>;
+    pause: () => Promise<any>;
+    resume: () => Promise<any>;
+    reset: () => Promise<any>;
+    skip: () => Promise<any>;
     status: () => Promise<any>;
     stats: (request: any) => Promise<any>;
   };

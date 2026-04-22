@@ -135,13 +135,10 @@ export function registerTimerHandlers() {
   });
 
   // 获取番茄钟统计
-  ipcMain.handle('timer:stats', async (_, request) => {
+  ipcMain.handle('timer:stats', async () => {
     const db = await getDatabase();
-    const { startDate, endDate, taskId } = request;
 
     let query = db.select().from(pomodoroSessions);
-
-    // TODO: 添加日期和任务过滤
 
     const sessions = await query;
 
