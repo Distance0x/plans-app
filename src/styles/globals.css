@@ -6,21 +6,17 @@
   :root {
     --background: 249 250 251;
     --foreground: 17 24 39;
-    --primary: 99 102 241;
-    --primary-foreground: 255 255 255;
   }
 
   .dark {
     --background: 17 24 39;
     --foreground: 249 250 251;
-    --primary: 99 102 241;
-    --primary-foreground: 255 255 255;
+  }
+
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
   }
 }
 
-@layer base {
-  body {
-    @apply bg-background text-foreground;
-  }
-}
 
