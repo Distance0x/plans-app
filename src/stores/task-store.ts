@@ -39,6 +39,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   fetchTasks: async (filters) => {
     set({ loading: true, error: null });
     try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
       const tasks = await window.electron.task.list(filters);
       set({ tasks, loading: false });
     } catch (error: any) {
@@ -49,6 +52,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   createTask: async (data) => {
     set({ loading: true, error: null });
     try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
       const task = await window.electron.task.create(data);
       set((state) => ({
         tasks: [...state.tasks, task],
@@ -62,6 +68,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updateTask: async (id, updates) => {
     set({ loading: true, error: null });
     try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
       const updated = await window.electron.task.update(id, updates);
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === id ? updated : t)),
@@ -75,6 +84,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   deleteTask: async (id) => {
     set({ loading: true, error: null });
     try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
       await window.electron.task.delete(id);
       set((state) => ({
         tasks: state.tasks.filter((t) => t.id !== id),
@@ -96,6 +108,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   searchTasks: async (query) => {
     set({ loading: true, error: null });
     try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
       const tasks = await window.electron.task.search(query);
       set({ tasks, loading: false });
     } catch (error: any) {
