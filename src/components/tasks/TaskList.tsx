@@ -2,16 +2,25 @@ import { useEffect, useState } from 'react';
 import { useTaskStore } from '@/stores/task-store';
 import { TaskItem } from './TaskItem';
 import { TaskForm } from './TaskForm';
+import { TaskFilters } from './TaskFilters';
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function TaskList() {
-  const { tasks, loading, error, fetchTasks } = useTaskStore();
+  const { tasks, loading, error, fetchTasks, searchTasks } = useTaskStore();
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     fetchTasks({ parentId: null });
   }, [fetchTasks]);
+
+  const handleSearch = async (query: string) => {
+    await searchTasks(query);
+  };
+
+  const handleFilterChange = async (filters: any) => {
+    await fetchTasks({ ...filters, parentId: null });
+  };
 
   if (loading && tasks.length === 0) {
     return (
@@ -41,6 +50,9 @@ export function TaskList() {
           添加任务
         </Button>
       </div>
+
+      {/* 搜索和过滤 */}
+      <TaskFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
 
       {/* 任务列表 */}
       {tasks.length === 0 ? (
