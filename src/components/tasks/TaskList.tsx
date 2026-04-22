@@ -1,22 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTaskStore } from '@/stores/task-store';
 import { TaskItem } from './TaskItem';
+import { TaskForm } from './TaskForm';
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function TaskList() {
-  const { tasks, loading, error, fetchTasks, createTask } = useTaskStore();
+  const { tasks, loading, error, fetchTasks } = useTaskStore();
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     fetchTasks({ parentId: null });
   }, [fetchTasks]);
-
-  const handleQuickAdd = async () => {
-    await createTask({
-      title: '新任务',
-      priority: 'medium',
-    });
-  };
 
   if (loading && tasks.length === 0) {
     return (
@@ -41,7 +36,7 @@ export function TaskList() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           今日任务
         </h2>
-        <Button onClick={handleQuickAdd} size="sm">
+        <Button onClick={() => setShowForm(true)} size="sm">
           <Plus className="w-4 h-4 mr-2" />
           添加任务
         </Button>
@@ -51,7 +46,7 @@ export function TaskList() {
       {tasks.length === 0 ? (
         <div className="glass-card p-12 rounded-lg text-center backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border border-white/30">
           <p className="text-gray-500 mb-4">还没有任务</p>
-          <Button onClick={handleQuickAdd}>
+          <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
             创建第一个任务
           </Button>
@@ -63,6 +58,9 @@ export function TaskList() {
           ))}
         </div>
       )}
+
+      {/* 任务表单 */}
+      {showForm && <TaskForm onClose={() => setShowForm(false)} />}
     </div>
   );
 }
