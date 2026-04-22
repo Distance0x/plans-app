@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerTaskHandlers } from '../ipc/task-handler';
+import { registerTimerHandlers } from '../ipc/timer-handler';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -36,6 +37,7 @@ function createWindow() {
 app.whenReady().then(async () => {
   // 注册 IPC 处理器
   registerTaskHandlers();
+  registerTimerHandlers();
 
   createWindow();
 
