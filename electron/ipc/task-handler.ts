@@ -5,10 +5,9 @@ import { eq, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export function registerTaskHandlers() {
-  const db = getDatabase();
-
   // 创建任务
   ipcMain.handle('task:create', async (_, data) => {
+    const db = await getDatabase();
     const now = new Date().toISOString();
     const task = {
       id: randomUUID(),
@@ -33,6 +32,7 @@ export function registerTaskHandlers() {
 
   // 更新任务
   ipcMain.handle('task:update', async (_, id, updates) => {
+    const db = await getDatabase();
     const now = new Date().toISOString();
     const updateData: any = {
       ...updates,
@@ -51,11 +51,13 @@ export function registerTaskHandlers() {
 
   // 删除任务
   ipcMain.handle('task:delete', async (_, id) => {
+    const db = await getDatabase();
     await db.delete(tasks).where(eq(tasks.id, id));
   });
 
   // 获取任务列表
   ipcMain.handle('task:list', async (_, filters = {}) => {
+    const db = await getDatabase();
     const conditions = [];
 
     if (filters.status) {
@@ -90,6 +92,7 @@ export function registerTaskHandlers() {
 
   // 搜索任务
   ipcMain.handle('task:search', async (_, searchQuery) => {
+    const db = await getDatabase();
     const result = await db
       .select()
       .from(tasks)

@@ -33,7 +33,7 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 注册 IPC 处理器
   registerTaskHandlers();
 

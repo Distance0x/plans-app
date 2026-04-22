@@ -1,14 +1,18 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
+import { drizzle } from 'drizzle-orm/sql-js';
 import * as schema from './schema';
 import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 
 let db: ReturnType<typeof drizzle> | null = null;
+let sqlDb: SqlJsDatabase | null = null;
 
-export function getDatabase() {
+export async function getDatabase() {
   if (db) return db;
+
+  // 初始化 sql.js
+  const SQL = await initSqlJs();
 
   // 获取用户数据目录
   const userDataPath = app.getPath('userData');
@@ -19,21 +23,33 @@ export function getDatabase() {
     fs.mkdirSync(userDataPath, { recursive: true });
   }
 
-  // 创建数据库连接
-  const sqlite = new Database(dbPath);
-  sqlite.pragma('journal_mode = WAL');
+  // 加载或创建数据库
+  if (fs.existsSync(dbPath)) {
+    const buffer = fs.readFileSync(dbPath);
+    sqlDb = new SQL.Database(buffer);
+  } else {
+    sqlDb = new SQL.Database();
+  }
 
-  db = drizzle(sqlite, { schema });
+  db = drizzle(sqlDb, { schema });
 
   // 初始化数据库
-  initDatabase(sqlite);
+  initDatabase(sqlDb);
+
+  // 定期保存数据库
+  setInterval(() => {
+    if (sqlDb) {
+      const data = sqlDb.export();
+      fs.writeFileSync(dbPath, data);
+    }
+  }, 5000);
 
   return db;
 }
 
-function initDatabase(sqlite: Database.Database) {
+function initDatabase(sqlDb: SqlJsDatabase) {
   // 创建表
-  sqlite.exec(`
+  sqlDb.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -89,23 +105,22 @@ function initDatabase(sqlite: Database.Database) {
   `);
 
   // 插入默认设置
+  const now = new Date().toISOString();
   const defaultSettings = [
-    { key: 'theme', value: '"light"' },
-    { key: 'workDuration', value: '1500' },
-    { key: 'shortBreakDuration', value: '300' },
-    { key: 'longBreakDuration', value: '1800' },
-    { key: 'pomodorosUntilLongBreak', value: '4' },
-    { key: 'soundEnabled', value: 'true' },
-    { key: 'notificationEnabled', value: 'true' },
+    ['theme', '"light"'],
+    ['workDuration', '1500'],
+    ['shortBreakDuration', '300'],
+    ['longBreakDuration', '1800'],
+    ['pomodorosUntilLongBreak', '4'],
+    ['soundEnabled', 'true'],
+    ['notificationEnabled', 'true'],
   ];
 
-  const insertSetting = sqlite.prepare(
-    'INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)'
-  );
-
-  const now = new Date().toISOString();
-  for (const setting of defaultSettings) {
-    insertSetting.run(setting.key, setting.value, now);
+  for (const [key, value] of defaultSettings) {
+    sqlDb.run(
+      'INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
+      [key, value, now]
+    );
   }
 }
 
