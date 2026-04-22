@@ -4,25 +4,23 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 210 40% 98%;
+    --background: 249 250 251;
+    --foreground: 17 24 39;
+    --primary: 99 102 241;
+    --primary-foreground: 255 255 255;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --background: 17 24 39;
+    --foreground: 249 250 251;
+    --primary: 99 102 241;
+    --primary-foreground: 255 255 255;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
     @apply bg-background text-foreground;
   }
 }
+
