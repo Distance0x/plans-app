@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "description": "番茄钟 + 任务管理 + 日历视图",
   "main": "dist-electron/main/index.js",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
     "preview": "vite preview",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:dev": "npm run build:electron && cross-env NODE_ENV=development electron .",
     "electron:build": "npm run build && electron-builder"
   },
   "keywords": [
@@ -39,6 +39,7 @@
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.0",
+    "cross-env": "^10.1.0",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.0",
     "postcss": "^8.4.32",
