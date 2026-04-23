@@ -12,6 +12,7 @@ interface CalendarProps {
     title: string;
     dueDate?: string;
     dueTime?: string;
+    duration?: number;
     status: string;
     priority: string;
   }>;
@@ -125,10 +126,10 @@ export function Calendar({ tasks }: CalendarProps) {
         />
       )}
       {viewMode === 'week' && (
-        <WeekView currentDate={currentDate} tasks={tasks} />
+        <WeekView currentDate={currentDate} tasks={tasks} updateTask={updateTask} />
       )}
       {viewMode === 'day' && (
-        <DayView currentDate={currentDate} tasks={tasks} />
+        <DayView currentDate={currentDate} tasks={tasks} updateTask={updateTask} />
       )}
     </div>
   );
@@ -269,7 +270,7 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
 }
 
 // 周视图组件
-function WeekView({ currentDate, tasks }: any) {
+function WeekView({ currentDate, tasks, updateTask }: any) {
   const startOfWeek = new Date(currentDate);
   startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
 
@@ -287,14 +288,24 @@ function WeekView({ currentDate, tasks }: any) {
     return tasks.filter((task: any) => task.dueDate === dateStr);
   };
 
-  const getTaskPosition = (time: string) => {
-    if (!time) return { top: 0, height: 60 };
-    const [hours, minutes] = time.split(':').map(Number);
+  const getTaskPosition = (task: any) => {
+    if (!task.dueTime) return { top: 0, height: 60 };
+    const [hours, minutes] = task.dueTime.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes;
     return {
-      top: (totalMinutes / 60) * 60, // 每小时60px
-      height: 60, // 默认1小时
+      top: totalMinutes,
+      height: Math.max(Number(task.duration) || 60, 30),
     };
+  };
+
+  const handleTimeDrop = async (e: React.DragEvent, date: Date, hour: number) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+
+    const dueDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const dueTime = `${String(hour).padStart(2, '0')}:00`;
+    await updateTask(taskId, { dueDate, dueTime });
   };
 
   const today = new Date();
@@ -346,17 +357,21 @@ function WeekView({ currentDate, tasks }: any) {
                   <div
                     key={hour}
                     className="h-[60px] border-b border-gray-100 dark:border-gray-700"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleTimeDrop(e, date, hour)}
                   ></div>
                 ))}
 
                 {/* 任务卡片 */}
                 {dayTasks.map((task: any) => {
-                  const pos = getTaskPosition(task.dueTime);
+                  const pos = getTaskPosition(task);
                   return (
                     <div
                       key={task.id}
+                      draggable
+                      onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
                       className={cn(
-                        'absolute left-0 right-0 mx-1 px-2 py-1 rounded text-xs cursor-pointer',
+                        'absolute left-0 right-0 mx-1 px-2 py-1 rounded text-xs cursor-move',
                         'overflow-hidden',
                         task.priority === 'high'
                           ? 'bg-red-100 text-red-700 border-l-2 border-red-500'
@@ -371,7 +386,7 @@ function WeekView({ currentDate, tasks }: any) {
                       }}
                       title={task.title}
                     >
-                      <div className="font-medium">{task.dueTime || '全天'}</div>
+                      <div className="font-medium">{task.dueTime || '全天'} · {task.duration || 60}m</div>
                       <div className="truncate">{task.title}</div>
                     </div>
                   );
@@ -386,7 +401,7 @@ function WeekView({ currentDate, tasks }: any) {
 }
 
 // 日视图组件
-function DayView({ currentDate, tasks }: any) {
+function DayView({ currentDate, tasks, updateTask }: any) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
@@ -411,6 +426,17 @@ function DayView({ currentDate, tasks }: any) {
     });
   };
 
+  const handleTimeDrop = async (e: React.DragEvent, hour: number) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+
+    await updateTask(taskId, {
+      dueDate: dateStr,
+      dueTime: `${String(hour).padStart(2, '0')}:00`,
+    });
+  };
+
   const weekDayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const dayOfWeek = currentDate.getDay();
 
@@ -428,8 +454,6 @@ function DayView({ currentDate, tasks }: any) {
       <div className="space-y-6">
         {hours.map((hour) => {
           const hourTasks = getTasksForHour(hour);
-          if (hourTasks.length === 0) return null;
-
           return (
             <div key={hour} className="flex gap-4">
               {/* 时间标签 */}
@@ -440,12 +464,21 @@ function DayView({ currentDate, tasks }: any) {
               </div>
 
               {/* 任务卡片 */}
-              <div className="flex-1 space-y-2">
+              <div
+                className={cn(
+                  'flex-1 min-h-[60px] space-y-2 rounded-lg border border-transparent p-1',
+                  hourTasks.length === 0 && 'border-dashed border-gray-200 dark:border-gray-700'
+                )}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleTimeDrop(e, hour)}
+              >
                 {hourTasks.map((task: any) => (
                   <div
                     key={task.id}
+                    draggable
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
                     className={cn(
-                      'p-4 rounded-lg border-l-4 cursor-pointer transition-all',
+                      'p-4 rounded-lg border-l-4 cursor-move transition-all',
                       'hover:shadow-md',
                       task.priority === 'high'
                         ? 'bg-red-50 border-red-500 dark:bg-red-900/20'
@@ -459,7 +492,7 @@ function DayView({ currentDate, tasks }: any) {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                            {task.dueTime || '全天'}
+                            {task.dueTime || '全天'} · {task.duration || 60}m
                           </span>
                           {task.status === 'completed' && (
                             <span className="text-xs text-green-600">✓ 已完成</span>

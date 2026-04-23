@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTimerStore } from '@/stores/timer-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import { Play, Pause, RotateCcw, SkipForward, Timer, Settings } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
+import { FocusStats } from './FocusStats';
 
 export function PomodoroTimer() {
   const {
@@ -19,15 +21,30 @@ export function PomodoroTimer() {
     skip,
     fetchStatus,
   } = useTimerStore();
+  const {
+    workDuration: savedWorkDuration,
+    shortBreakDuration: savedShortBreakDuration,
+    longBreakDuration: savedLongBreakDuration,
+    loadSettings,
+    updateSettings,
+  } = useSettingsStore();
 
   const [showSettings, setShowSettings] = useState(false);
-  const [workDuration, setWorkDuration] = useState(25);
-  const [shortBreakDuration, setShortBreakDuration] = useState(5);
-  const [longBreakDuration, setLongBreakDuration] = useState(30);
+  const [lockMode, setLockMode] = useState(false);
+  const [workDuration, setWorkDuration] = useState(savedWorkDuration / 60);
+  const [shortBreakDuration, setShortBreakDuration] = useState(savedShortBreakDuration / 60);
+  const [longBreakDuration, setLongBreakDuration] = useState(savedLongBreakDuration / 60);
 
   useEffect(() => {
     fetchStatus();
-  }, [fetchStatus]);
+    loadSettings();
+  }, [fetchStatus, loadSettings]);
+
+  useEffect(() => {
+    setWorkDuration(Math.round(savedWorkDuration / 60));
+    setShortBreakDuration(Math.round(savedShortBreakDuration / 60));
+    setLongBreakDuration(Math.round(savedLongBreakDuration / 60));
+  }, [savedWorkDuration, savedShortBreakDuration, savedLongBreakDuration]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -114,8 +131,13 @@ export function PomodoroTimer() {
 
             <div className="flex gap-2">
               <Button
-                onClick={() => {
-                  // TODO: 保存设置到 store
+                onClick={async () => {
+                  await updateSettings({
+                    workDuration: Math.max(1, workDuration) * 60,
+                    shortBreakDuration: Math.max(1, shortBreakDuration) * 60,
+                    longBreakDuration: Math.max(1, longBreakDuration) * 60,
+                  });
+                  await fetchStatus();
                   setShowSettings(false);
                 }}
                 className="flex-1"
@@ -208,6 +230,35 @@ export function PomodoroTimer() {
               <SkipForward className="w-5 h-5" />
             </Button>
           </div>
+
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <input
+              id="lock-mode"
+              type="checkbox"
+              checked={lockMode}
+              onChange={(e) => setLockMode(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <label htmlFor="lock-mode">锁屏专注模式</label>
+          </div>
+
+          <FocusStats />
+
+          {lockMode && isRunning && !isPaused && (
+            <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-gray-950 text-white">
+              <div className="text-sm text-gray-400 mb-3">{sessionLabels[sessionType]}</div>
+              <div className="text-7xl font-bold mb-6">{formatTime(remainingTime)}</div>
+              <div className="flex gap-3">
+                <Button onClick={pause} size="lg">
+                  <Pause className="w-5 h-5 mr-2" />
+                  暂停
+                </Button>
+                <Button onClick={() => setLockMode(false)} variant="outline" size="lg">
+                  退出锁屏
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

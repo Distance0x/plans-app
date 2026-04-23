@@ -1,20 +1,37 @@
-import { useTaskStore } from '@/stores/task-store';
+import { useEffect, useRef } from 'react';
+import { useTaskStore, type Task } from '@/stores/task-store';
 import { CheckCircle, Circle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SubTaskList } from './SubTaskList';
 
 interface TaskItemProps {
-  task: {
-    id: string;
-    title: string;
-    description?: string;
-    priority: 'high' | 'medium' | 'low';
-    status: 'todo' | 'in_progress' | 'completed';
-    dueDate?: string;
-  };
+  task: Task;
+  level?: number;
 }
 
-export function TaskItem({ task }: TaskItemProps) {
-  const { toggleComplete, deleteTask } = useTaskStore();
+export function TaskItem({ task, level = 0 }: TaskItemProps) {
+  const itemRef = useRef<HTMLDivElement>(null);
+  const {
+    tasks,
+    focusedTaskId,
+    setFocusedTask,
+    createTask,
+    toggleComplete,
+    deleteTask,
+  } = useTaskStore();
+  const subTasks = tasks.filter((item) => item.parentId === task.id);
+  const canNest = level < 2;
+  const isFocused = focusedTaskId === task.id;
+  const attachments = parseAttachments(task.attachments);
+
+  useEffect(() => {
+    if (!isFocused || !itemRef.current) return;
+
+    itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = window.setTimeout(() => setFocusedTask(null), 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [isFocused, setFocusedTask]);
 
   const priorityColors = {
     high: 'text-red-500 border-red-200',
@@ -24,8 +41,13 @@ export function TaskItem({ task }: TaskItemProps) {
 
   return (
     <div
+      ref={itemRef}
       className={cn(
-        'glass-card p-4 rounded-lg border backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border-white/30 shadow-md hover:shadow-lg transition-all',
+        level === 0
+          ? 'glass-card p-4 rounded-lg border backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border-white/30 shadow-md hover:shadow-lg'
+          : 'p-2 rounded-lg border border-gray-100 dark:border-gray-700 bg-white/40 dark:bg-gray-800/40',
+        'transition-all',
+        isFocused && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
         task.status === 'completed' && 'opacity-60'
       )}
     >
@@ -57,6 +79,11 @@ export function TaskItem({ task }: TaskItemProps) {
               {task.description}
             </p>
           )}
+          {task.notes && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 whitespace-pre-wrap line-clamp-3">
+              {task.notes}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-2">
             <span
               className={cn(
@@ -67,7 +94,15 @@ export function TaskItem({ task }: TaskItemProps) {
               {task.priority}
             </span>
             {task.dueDate && (
-              <span className="text-xs text-gray-500">{task.dueDate}</span>
+              <span className="text-xs text-gray-500">
+                {task.dueDate}{task.dueTime ? ` ${task.dueTime}` : ''}
+              </span>
+            )}
+            {task.recurrenceRule && (
+              <span className="text-xs text-purple-600">重复</span>
+            )}
+            {attachments.length > 0 && (
+              <span className="text-xs text-gray-500">附件 {attachments.length}</span>
             )}
           </div>
         </div>
@@ -80,6 +115,39 @@ export function TaskItem({ task }: TaskItemProps) {
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
+
+      {canNest && (
+        <div className="mt-3 pl-8">
+          <SubTaskList
+            taskId={task.id}
+            subTasks={subTasks as any}
+            onAddSubTask={(title) =>
+              createTask({
+                title,
+                parentId: task.id,
+                priority: 'medium',
+                status: 'todo',
+              })
+            }
+            onToggleSubTask={toggleComplete}
+            onDeleteSubTask={deleteTask}
+            renderSubTask={(subTask) => (
+              <TaskItem task={subTask as Task} level={level + 1} />
+            )}
+          />
+        </div>
+      )}
     </div>
   );
+}
+
+function parseAttachments(value?: string | null) {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

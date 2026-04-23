@@ -58,13 +58,30 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       status TEXT CHECK(status IN ('todo', 'in_progress', 'completed')) DEFAULT 'todo',
       due_date TEXT,
       due_time TEXT,
+      duration INTEGER DEFAULT 60,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       completed_at TEXT,
       parent_id TEXT,
       order_index INTEGER DEFAULT 0,
       estimated_pomodoros INTEGER DEFAULT 0,
-      actual_pomodoros INTEGER DEFAULT 0
+      actual_pomodoros INTEGER DEFAULT 0,
+      notes TEXT,
+      attachments TEXT,
+      recurrence_rule TEXT,
+      recurrence_parent_id TEXT,
+      recurrence_count INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS reminders (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      trigger_at TEXT NOT NULL,
+      type TEXT CHECK(type IN ('due', 'before_due', 'custom')) DEFAULT 'due',
+      channel TEXT CHECK(channel IN ('notification', 'sound', 'both')) DEFAULT 'notification',
+      state TEXT CHECK(state IN ('pending', 'fired', 'cancelled')) DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS pomodoro_sessions (
@@ -100,9 +117,19 @@ function initDatabase(sqlDb: SqlJsDatabase) {
 
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+    CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_reminders_task_id ON reminders(task_id);
+    CREATE INDEX IF NOT EXISTS idx_reminders_state_trigger ON reminders(state, trigger_at);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_task_id ON pomodoro_sessions(task_id);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_start_time ON pomodoro_sessions(start_time);
   `);
+
+  ensureColumn(sqlDb, 'tasks', 'duration', 'INTEGER DEFAULT 60');
+  ensureColumn(sqlDb, 'tasks', 'notes', 'TEXT');
+  ensureColumn(sqlDb, 'tasks', 'attachments', 'TEXT');
+  ensureColumn(sqlDb, 'tasks', 'recurrence_rule', 'TEXT');
+  ensureColumn(sqlDb, 'tasks', 'recurrence_parent_id', 'TEXT');
+  ensureColumn(sqlDb, 'tasks', 'recurrence_count', 'INTEGER DEFAULT 0');
 
   // 插入默认设置
   const now = new Date().toISOString();
@@ -121,6 +148,15 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       'INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
       [key, value, now]
     );
+  }
+}
+
+function ensureColumn(sqlDb: SqlJsDatabase, table: string, column: string, definition: string) {
+  const tableInfo = sqlDb.exec(`PRAGMA table_info(${table})`);
+  const columns = tableInfo[0]?.values.map((row) => row[1]) ?? [];
+
+  if (!columns.includes(column)) {
+    sqlDb.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
 

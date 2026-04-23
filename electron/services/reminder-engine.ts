@@ -3,21 +3,11 @@ import { getDatabase } from '../database/db';
 import { tasks, reminders } from '../database/schema';
 import { eq, and, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import * as cron from 'node-cron';
-
-interface Reminder {
-  id: string;
-  taskId: string;
-  triggerAt: string; // ISO 8601
-  type: 'due' | 'before_due' | 'custom';
-  channel: 'notification' | 'sound' | 'both';
-  state: 'pending' | 'fired' | 'cancelled';
-  createdAt: string;
-}
+import { getNotificationService } from './notification-service';
 
 // 提醒调度器
 class ReminderEngine {
-  private cronJob: cron.ScheduledTask | null = null;
+  private pollTimer: NodeJS.Timeout | null = null;
   private mainWindow: Electron.BrowserWindow | null = null;
 
   constructor(mainWindow: Electron.BrowserWindow) {
@@ -26,19 +16,21 @@ class ReminderEngine {
 
   // 启动提醒引擎
   start() {
-    // 每分钟检查一次待触发的提醒
-    this.cronJob = cron.schedule('* * * * *', async () => {
+    void this.checkPendingReminders();
+
+    // 15 秒轮询一次，保证触发误差小于 30 秒
+    this.pollTimer = setInterval(async () => {
       await this.checkPendingReminders();
-    });
+    }, 15_000);
 
     console.log('[ReminderEngine] Started');
   }
 
   // 停止提醒引擎
   stop() {
-    if (this.cronJob) {
-      this.cronJob.stop();
-      this.cronJob = null;
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
     console.log('[ReminderEngine] Stopped');
   }
@@ -86,6 +78,18 @@ class ReminderEngine {
       }
 
       const taskData = task[0];
+
+      if (reminder.channel === 'notification' || reminder.channel === 'both') {
+        getNotificationService().showTaskReminder({
+          taskId: taskData.id,
+          taskTitle: taskData.title,
+          type: reminder.type,
+        }, {
+          sound: reminder.channel === 'both',
+        });
+      } else if (reminder.channel === 'sound') {
+        getNotificationService().playNotificationSound();
+      }
 
       // 发送通知到渲染进程
       if (this.mainWindow) {
@@ -169,6 +173,21 @@ class ReminderEngine {
 
     console.log('[ReminderEngine] Cancelled all reminders for task:', taskId);
   }
+
+  // 获取任务的待触发提醒
+  async listTaskReminders(taskId: string) {
+    const db = await getDatabase();
+
+    return await db
+      .select()
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.taskId, taskId),
+          eq(reminders.state, 'pending')
+        )
+      );
+  }
 }
 
 let reminderEngine: ReminderEngine | null = null;
@@ -208,5 +227,13 @@ export function registerReminderHandlers() {
       throw new Error('ReminderEngine not initialized');
     }
     await reminderEngine.cancelTaskReminders(taskId);
+  });
+
+  // 获取任务的待触发提醒
+  ipcMain.handle('reminder:list-task', async (_, taskId) => {
+    if (!reminderEngine) {
+      throw new Error('ReminderEngine not initialized');
+    }
+    return await reminderEngine.listTaskReminders(taskId);
   });
 }

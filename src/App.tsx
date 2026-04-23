@@ -4,9 +4,6 @@ import {
   Calendar,
   Inbox,
   Clock,
-  Briefcase,
-  Home,
-  Heart,
   ChevronRight,
   ChevronDown,
   Plus,
@@ -15,9 +12,12 @@ import {
   Search
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
+import { TaskForm } from './components/tasks/TaskForm';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
 import { useTaskStore } from './stores/task-store';
+import { useTimerStore } from './stores/timer-store';
+import { useSettingsStore, type ThemeMode } from './stores/settings-store';
 import { useEffect } from 'react';
 import { cn } from './lib/utils';
 
@@ -33,14 +33,84 @@ interface SidebarGroup {
 }
 
 function App() {
-  const { tasks, fetchTasks } = useTaskStore();
+  const { tasks, fetchTasks, setFocusedTask } = useTaskStore();
+  const { start } = useTimerStore();
+  const { theme, loadSettings, updateSettings } = useSettingsStore();
   const [currentView, setCurrentView] = useState<ViewType>('today');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['today-tasks']));
+  const [showQuickTaskForm, setShowQuickTaskForm] = useState(false);
 
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+    loadSettings();
+  }, [fetchTasks, loadSettings]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const applyTheme = () => {
+      const shouldUseDark =
+        theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      root.classList.toggle('dark', shouldUseDark);
+    };
+
+    applyTheme();
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    media.addEventListener('change', applyTheme);
+
+    return () => media.removeEventListener('change', applyTheme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!window.electron) return;
+
+    const handleFocusTask = (taskId: string) => {
+      setCurrentView('inbox');
+      setSelectedGroup(null);
+      setFocusedTask(taskId);
+    };
+
+    const handleQuickAddTask = () => {
+      setCurrentView('inbox');
+      setSelectedGroup(null);
+      setShowQuickTaskForm(true);
+    };
+
+    const handleTrayStartPomodoro = () => {
+      setCurrentView('pomodoro');
+      start();
+    };
+
+    const handleNotificationSound = () => {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const audioContext = new AudioContextClass();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gain.gain.value = 0.08;
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.18);
+    };
+
+    window.electron.on('focus-task', handleFocusTask);
+    window.electron.on('quick-add-task', handleQuickAddTask);
+    window.electron.on('tray-start-pomodoro', handleTrayStartPomodoro);
+    window.electron.on('play-notification-sound', handleNotificationSound);
+
+    return () => {
+      window.electron.off('focus-task', handleFocusTask);
+      window.electron.off('quick-add-task', handleQuickAddTask);
+      window.electron.off('tray-start-pomodoro', handleTrayStartPomodoro);
+      window.electron.off('play-notification-sound', handleNotificationSound);
+    };
+  }, [setFocusedTask, start]);
 
   // 计算任务数量
   const todayTasks = tasks.filter(t => {
@@ -86,6 +156,15 @@ function App() {
       newExpanded.add(groupId);
     }
     setExpandedGroups(newExpanded);
+  };
+
+  const cycleTheme = async () => {
+    const nextTheme: Record<ThemeMode, ThemeMode> = {
+      light: 'dark',
+      dark: 'system',
+      system: 'light',
+    };
+    await updateSettings({ theme: nextTheme[theme] });
   };
 
   const getFilteredTasks = () => {
@@ -282,6 +361,31 @@ function App() {
 
         {/* 底部番茄钟 */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={cycleTheme}
+              className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              主题: {theme === 'light' ? '浅色' : theme === 'dark' ? '深色' : '系统'}
+            </button>
+            <button
+              onClick={() => window.electron.backup.export()}
+              className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              导出
+            </button>
+            <button
+              onClick={async () => {
+                const result = await window.electron.backup.import();
+                if (!result.cancelled) {
+                  await fetchTasks();
+                }
+              }}
+              className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              导入
+            </button>
+          </div>
           <div className="text-xs text-gray-500 mb-2">番茄钟</div>
           <PomodoroTimer />
         </div>
@@ -325,7 +429,10 @@ function App() {
                     {getFilteredTasks().length} 个任务
                   </p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                <button
+                  onClick={() => setShowQuickTaskForm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
                   <Plus className="w-4 h-4" />
                   添加任务
                 </button>
@@ -339,6 +446,15 @@ function App() {
           </>
         )}
       </div>
+
+      {showQuickTaskForm && (
+        <TaskForm
+          onClose={async () => {
+            setShowQuickTaskForm(false);
+            await fetchTasks();
+          }}
+        />
+      )}
     </div>
   );
 }

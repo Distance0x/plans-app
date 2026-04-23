@@ -2,10 +2,15 @@ import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerTaskHandlers } from '../ipc/task-handler';
 import { registerTimerHandlers } from '../ipc/timer-handler';
+import { registerSettingsHandlers } from '../ipc/settings-handler';
+import { registerBackupHandlers } from '../ipc/backup-handler';
 import { initReminderEngine, registerReminderHandlers, stopReminderEngine } from '../services/reminder-engine';
 import { initNotificationService } from '../services/notification-service';
+import { createAppTray } from '../utils/tray';
 
 let mainWindow: BrowserWindow | null = null;
+
+app.setAppUserModelId('com.plans.app');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -44,14 +49,17 @@ app.whenReady().then(async () => {
   // 注册 IPC 处理器
   registerTaskHandlers();
   registerTimerHandlers();
+  registerSettingsHandlers();
+  registerBackupHandlers();
   registerReminderHandlers();
 
   createWindow();
 
   // 初始化提醒引擎和通知服务
   if (mainWindow) {
-    initReminderEngine(mainWindow);
     initNotificationService(mainWindow);
+    initReminderEngine(mainWindow);
+    createAppTray(mainWindow);
   }
 
   app.on('activate', () => {

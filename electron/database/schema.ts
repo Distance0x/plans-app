@@ -8,6 +8,7 @@ export const tasks = sqliteTable('tasks', {
   status: text('status', { enum: ['todo', 'in_progress', 'completed'] }).default('todo'),
   dueDate: text('due_date'),
   dueTime: text('due_time'),
+  duration: integer('duration').default(60),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   completedAt: text('completed_at'),
@@ -15,6 +16,8 @@ export const tasks = sqliteTable('tasks', {
   orderIndex: integer('order_index').default(0),
   estimatedPomodoros: integer('estimated_pomodoros').default(0),
   actualPomodoros: integer('actual_pomodoros').default(0),
+  notes: text('notes'),
+  attachments: text('attachments'), // JSON string
   // 重复规则
   recurrenceRule: text('recurrence_rule'), // JSON string
   recurrenceParentId: text('recurrence_parent_id'), // 原始重复任务 ID

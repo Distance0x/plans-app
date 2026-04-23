@@ -19,6 +19,24 @@ export interface ElectronAPI {
     get: () => Promise<any>;
     update: (updates: any) => Promise<any>;
   };
+  reminder: {
+    create: (
+      taskId: string,
+      triggerAt: string,
+      type?: 'due' | 'before_due' | 'custom',
+      channel?: 'notification' | 'sound' | 'both'
+    ) => Promise<string>;
+    cancel: (reminderId: string) => Promise<void>;
+    cancelTask: (taskId: string) => Promise<void>;
+    listTask: (taskId: string) => Promise<any[]>;
+  };
+  backup: {
+    export: () => Promise<{ cancelled: boolean; filePath?: string }>;
+    import: () => Promise<{ cancelled: boolean; filePath?: string }>;
+  };
+  file: {
+    selectAttachments: () => Promise<string[]>;
+  };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }

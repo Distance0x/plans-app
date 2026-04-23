@@ -11,7 +11,7 @@ export function TaskList() {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    fetchTasks({ parentId: null });
+    fetchTasks();
   }, [fetchTasks]);
 
   const handleSearch = async (query: string) => {
@@ -19,8 +19,10 @@ export function TaskList() {
   };
 
   const handleFilterChange = async (filters: any) => {
-    await fetchTasks({ ...filters, parentId: null });
+    await fetchTasks(filters);
   };
+
+  const rootTasks = tasks.filter((task) => !task.parentId);
 
   if (loading && tasks.length === 0) {
     return (
@@ -55,7 +57,7 @@ export function TaskList() {
       <TaskFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
 
       {/* 任务列表 */}
-      {tasks.length === 0 ? (
+      {rootTasks.length === 0 ? (
         <div className="glass-card p-12 rounded-lg text-center backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border border-white/30">
           <p className="text-gray-500 mb-4">还没有任务</p>
           <Button onClick={() => setShowForm(true)}>
@@ -65,7 +67,7 @@ export function TaskList() {
         </div>
       ) : (
         <div className="space-y-3">
-          {tasks.map((task) => (
+          {rootTasks.map((task) => (
             <TaskItem key={task.id} task={task} />
           ))}
         </div>

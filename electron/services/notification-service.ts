@@ -19,12 +19,10 @@ interface TaskNotification {
 export class NotificationService {
   private mainWindow: Electron.BrowserWindow | null = null;
   private iconPath: string;
-  private soundPath: string;
 
   constructor(mainWindow: Electron.BrowserWindow) {
     this.mainWindow = mainWindow;
     this.iconPath = path.join(__dirname, '../../assets/icon.png');
-    this.soundPath = path.join(__dirname, '../../assets/notification.wav');
   }
 
   // 显示任务提醒通知
@@ -68,14 +66,14 @@ export class NotificationService {
 
     // 播放声音（如果需要）
     if (options.sound && !options.silent) {
-      this.playSound();
+      this.playNotificationSound();
     }
 
     console.log('[NotificationService] Notification shown:', options.title);
   }
 
   // 播放提醒声音
-  private playSound() {
+  playNotificationSound() {
     // 在主窗口中播放声音
     if (this.mainWindow) {
       this.mainWindow.webContents.send('play-notification-sound');

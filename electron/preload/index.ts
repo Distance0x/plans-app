@@ -38,6 +38,18 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('reminder:cancel', reminderId),
     cancelTask: (taskId: string) =>
       ipcRenderer.invoke('reminder:cancel-task', taskId),
+    listTask: (taskId: string) =>
+      ipcRenderer.invoke('reminder:list-task', taskId),
+  },
+
+  // 备份和附件 API
+  backup: {
+    export: () => ipcRenderer.invoke('backup:export'),
+    import: () => ipcRenderer.invoke('backup:import'),
+  },
+
+  file: {
+    selectAttachments: () => ipcRenderer.invoke('file:select-attachments'),
   },
 
   // 事件监听

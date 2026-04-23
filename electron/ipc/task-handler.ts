@@ -1,8 +1,86 @@
 import { ipcMain } from 'electron';
 import { getDatabase } from '../database/db';
-import { tasks } from '../database/schema';
-import { eq, like, or, isNull } from 'drizzle-orm';
+import { reminders, tasks } from '../database/schema';
+import { and, eq, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { RecurrenceEngine } from '../services/recurrence-engine';
+
+function emptyToNull(value: unknown): string | null {
+  if (value === '' || value === undefined || value === null) {
+    return null;
+  }
+
+  return String(value);
+}
+
+function normalizeTaskInput(data: any) {
+  const recurrenceRule =
+    data.recurrenceRule && typeof data.recurrenceRule !== 'string'
+      ? JSON.stringify(data.recurrenceRule)
+      : emptyToNull(data.recurrenceRule);
+
+  return {
+    title: data.title,
+    description: emptyToNull(data.description),
+    priority: (data.priority || 'medium') as 'high' | 'medium' | 'low',
+    dueDate: emptyToNull(data.dueDate),
+    dueTime: emptyToNull(data.dueTime),
+    duration: data.duration ? Number(data.duration) : 60,
+    parentId: emptyToNull(data.parentId),
+    orderIndex: data.orderIndex || 0,
+    estimatedPomodoros: data.estimatedPomodoros || 0,
+    notes: emptyToNull(data.notes),
+    attachments: data.attachments ? JSON.stringify(data.attachments) : null,
+    recurrenceRule,
+  };
+}
+
+async function deleteTaskCascade(db: Awaited<ReturnType<typeof getDatabase>>, id: string) {
+  const childTasks = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(eq(tasks.parentId, id));
+
+  for (const child of childTasks) {
+    await deleteTaskCascade(db, child.id);
+  }
+
+  await db
+    .update(reminders)
+    .set({
+      state: 'cancelled',
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(reminders.taskId, id));
+
+  await db.delete(tasks).where(eq(tasks.id, id));
+}
+
+async function completeParentIfAllChildrenDone(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  parentId: string | null
+) {
+  if (!parentId) return;
+
+  const children = await db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.parentId, parentId));
+
+  if (children.length === 0 || children.some((child) => child.status !== 'completed')) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(tasks)
+    .set({
+      status: 'completed',
+      completedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(tasks.id, parentId));
+}
 
 export function registerTaskHandlers() {
   // 创建任务
@@ -11,19 +89,14 @@ export function registerTaskHandlers() {
     const now = new Date().toISOString();
     const task = {
       id: randomUUID(),
-      title: data.title,
-      description: data.description || null,
-      priority: (data.priority || 'medium') as 'high' | 'medium' | 'low',
+      ...normalizeTaskInput(data),
       status: 'todo' as const,
-      dueDate: data.dueDate || null,
-      dueTime: data.dueTime || null,
       createdAt: now,
       updatedAt: now,
       completedAt: null,
-      parentId: data.parentId || null,
-      orderIndex: data.orderIndex || 0,
-      estimatedPomodoros: data.estimatedPomodoros || 0,
       actualPomodoros: 0,
+      recurrenceParentId: null,
+      recurrenceCount: 0,
     };
 
     await db.insert(tasks).values(task);
@@ -34,25 +107,47 @@ export function registerTaskHandlers() {
   ipcMain.handle('task:update', async (_, id, updates) => {
     const db = await getDatabase();
     const now = new Date().toISOString();
+
+    const [existing] = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!existing) {
+      throw new Error('Task not found');
+    }
+
+    const normalized = normalizeTaskInput({ ...existing, ...updates });
     const updateData: any = {
-      ...updates,
       updatedAt: now,
     };
 
+    for (const key of Object.keys(updates)) {
+      if (key in normalized) {
+        updateData[key] = (normalized as any)[key];
+      } else {
+        updateData[key] = updates[key];
+      }
+    }
+
     if (updates.status === 'completed' && !updates.completedAt) {
       updateData.completedAt = now;
+    } else if (updates.status && updates.status !== 'completed') {
+      updateData.completedAt = null;
     }
 
     await db.update(tasks).set(updateData).where(eq(tasks.id, id));
 
     const [updated] = await db.select().from(tasks).where(eq(tasks.id, id));
+
+    if (existing.status !== 'completed' && updates.status === 'completed') {
+      await RecurrenceEngine.generateNextInstance(id);
+      await completeParentIfAllChildrenDone(db, updated.parentId);
+    }
+
     return updated;
   });
 
   // 删除任务
   ipcMain.handle('task:delete', async (_, id) => {
     const db = await getDatabase();
-    await db.delete(tasks).where(eq(tasks.id, id));
+    await deleteTaskCascade(db, id);
   });
 
   // 获取任务列表
@@ -83,7 +178,7 @@ export function registerTaskHandlers() {
     let query = db.select().from(tasks);
 
     if (conditions.length > 0) {
-      query = query.where(conditions[0]) as any;
+      query = query.where(and(...conditions)) as any;
     }
 
     const result = await query;

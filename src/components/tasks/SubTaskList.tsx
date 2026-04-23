@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Plus, Check, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,7 @@ interface SubTaskListProps {
   onAddSubTask: (title: string) => void;
   onToggleSubTask: (subTaskId: string) => void;
   onDeleteSubTask: (subTaskId: string) => void;
+  renderSubTask?: (subTask: SubTask) => ReactNode;
 }
 
 export function SubTaskList({
@@ -25,6 +27,7 @@ export function SubTaskList({
   onAddSubTask,
   onToggleSubTask,
   onDeleteSubTask,
+  renderSubTask,
 }: SubTaskListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
@@ -43,7 +46,7 @@ export function SubTaskList({
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   return (
-    <div className="space-y-3">
+    <div id={`subtasks-${taskId}`} className="space-y-3">
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <button
@@ -90,45 +93,49 @@ export function SubTaskList({
       {expanded && (
         <div className="space-y-2">
           {subTasks.map((subTask) => (
-            <div
-              key={subTask.id}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 group"
-            >
-              {/* 完成按钮 */}
-              <button
-                onClick={() => onToggleSubTask(subTask.id)}
-                className={cn(
-                  'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
-                  subTask.status === 'completed'
-                    ? 'bg-blue-500 border-blue-500'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-500'
-                )}
+            renderSubTask ? (
+              <div key={subTask.id}>{renderSubTask(subTask)}</div>
+            ) : (
+              <div
+                key={subTask.id}
+                className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 group"
               >
-                {subTask.status === 'completed' && (
-                  <Check className="w-3 h-3 text-white" />
-                )}
-              </button>
+                {/* 完成按钮 */}
+                <button
+                  onClick={() => onToggleSubTask(subTask.id)}
+                  className={cn(
+                    'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
+                    subTask.status === 'completed'
+                      ? 'bg-blue-500 border-blue-500'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-blue-500'
+                  )}
+                >
+                  {subTask.status === 'completed' && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
+                </button>
 
-              {/* 标题 */}
-              <span
-                className={cn(
-                  'flex-1 text-sm',
-                  subTask.status === 'completed'
-                    ? 'line-through text-gray-500'
-                    : 'text-gray-900 dark:text-white'
-                )}
-              >
-                {subTask.title}
-              </span>
+                {/* 标题 */}
+                <span
+                  className={cn(
+                    'flex-1 text-sm',
+                    subTask.status === 'completed'
+                      ? 'line-through text-gray-500'
+                      : 'text-gray-900 dark:text-white'
+                  )}
+                >
+                  {subTask.title}
+                </span>
 
-              {/* 删除按钮 */}
-              <button
-                onClick={() => onDeleteSubTask(subTask.id)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-opacity"
-              >
-                <Trash2 className="w-4 h-4 text-red-500" />
-              </button>
-            </div>
+                {/* 删除按钮 */}
+                <button
+                  onClick={() => onDeleteSubTask(subTask.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-opacity"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            )
           ))}
 
           {/* 添加子任务输入框 */}
