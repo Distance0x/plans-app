@@ -140,32 +140,35 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const firstDayOfWeek = firstDay.getDay();
-  const daysInMonth = lastDay.getDate();
+  const firstVisibleDay = new Date(year, month, 1);
+  firstVisibleDay.setDate(firstVisibleDay.getDate() - firstVisibleDay.getDay());
 
-  const calendarDays: (number | null)[] = [];
-  for (let i = 0; i < firstDayOfWeek; i++) {
-    calendarDays.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    calendarDays.push(i);
+  const calendarDays: Date[] = [];
+  for (let i = 0; i < 42; i++) {
+    const date = new Date(firstVisibleDay);
+    date.setDate(firstVisibleDay.getDate() + i);
+    calendarDays.push(date);
   }
 
-  const getTasksForDay = (day: number) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const getDateKey = (date: Date) => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
+  const getTasksForDay = (date: Date) => {
+    const dateStr = getDateKey(date);
     return tasks.filter((task: any) => task.dueDate === dateStr);
   };
 
   const today = new Date();
-  const isToday = (day: number) => {
+  const isToday = (date: Date) => {
     return (
-      day === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
     );
   };
+
+  const isCurrentMonth = (date: Date) => date.getMonth() === month;
 
   const handleDragStart = (taskId: string) => {
     setDraggedTask(taskId);
@@ -175,11 +178,10 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
     e.preventDefault();
   };
 
-  const handleDrop = async (day: number) => {
+  const handleDrop = async (date: Date) => {
     if (!draggedTask) return;
-    const newDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     try {
-      await updateTask(draggedTask, { dueDate: newDate });
+      await updateTask(draggedTask, { dueDate: getDateKey(date) });
       setDraggedTask(null);
     } catch (error) {
       console.error('Failed to update task date:', error);
@@ -189,13 +191,13 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
   const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
   return (
-    <>
+    <div className="overflow-hidden rounded-lg border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
       {/* 星期标题 */}
-      <div className="grid grid-cols-7 gap-2 mb-2">
+      <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/60">
         {weekDays.map((day) => (
           <div
             key={day}
-            className="text-center text-sm font-medium text-gray-500 dark:text-gray-400 py-2"
+            className="py-2 text-center text-sm font-medium text-gray-500 dark:text-gray-400"
           >
             周{day}
           </div>
@@ -203,61 +205,63 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
       </div>
 
       {/* 日历网格 */}
-      <div className="grid grid-cols-7 gap-2">
-        {calendarDays.map((day, index) => {
-          if (day === null) {
-            return <div key={`empty-${index}`} className="aspect-square" />;
-          }
-
-          const dayTasks = getTasksForDay(day);
+      <div className="grid grid-cols-7">
+        {calendarDays.map((date) => {
+          const dayTasks = getTasksForDay(date);
+          const currentMonth = isCurrentMonth(date);
+          const todayCell = isToday(date);
 
           return (
             <div
-              key={day}
+              key={getDateKey(date)}
               className={cn(
-                'min-h-[100px] p-2 rounded-lg border transition-all cursor-pointer',
-                'hover:border-blue-400 hover:shadow-md',
-                isToday(day)
-                  ? 'bg-blue-500 text-white border-blue-600'
-                  : 'bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600',
-                draggedTask && 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                'min-h-[116px] border-r border-b border-gray-100 p-1.5 transition-colors',
+                'hover:bg-blue-50/50 dark:border-gray-800 dark:hover:bg-blue-950/20',
+                !currentMonth && 'bg-gray-50/60 text-gray-400 dark:bg-gray-900/40',
+                draggedTask && 'bg-blue-50/40 dark:bg-blue-950/20'
               )}
               onDragOver={handleDragOver}
-              onDrop={() => handleDrop(day)}
+              onDrop={() => handleDrop(date)}
             >
               <div className="flex flex-col h-full">
                 <div
                   className={cn(
-                    'text-sm font-medium mb-2',
-                    isToday(day) ? 'text-white' : 'text-gray-900 dark:text-white'
+                    'mb-1 flex h-6 items-center text-sm font-medium',
+                    currentMonth ? 'text-gray-900 dark:text-white' : 'text-gray-400',
+                    todayCell && 'text-blue-600 dark:text-blue-300'
                   )}
                 >
-                  {day}
+                  <span
+                    className={cn(
+                      'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1',
+                      todayCell && 'bg-blue-500 text-white'
+                    )}
+                  >
+                    {date.getDate()}
+                  </span>
                 </div>
                 {dayTasks.length > 0 && (
                   <div className="flex-1 flex flex-col gap-1 overflow-hidden">
-                    {dayTasks.map((task: any) => (
+                    {dayTasks.slice(0, 4).map((task: any, taskIndex: number) => (
                       <div
                         key={task.id}
                         draggable
                         onDragStart={() => handleDragStart(task.id)}
                         className={cn(
-                          'text-xs px-2 py-1 rounded cursor-move truncate',
-                          task.priority === 'high'
-                            ? 'bg-red-100 text-red-700 border-l-2 border-red-500'
-                            : task.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-700 border-l-2 border-yellow-500'
-                            : 'bg-blue-100 text-blue-700 border-l-2 border-blue-500',
+                          'flex h-6 cursor-move items-center gap-1 rounded px-1.5 text-[12px] leading-none shadow-sm',
+                          getMonthTaskColor(task, taskIndex),
                           task.status === 'completed' && 'opacity-50 line-through'
                         )}
-                        title={task.title}
+                        title={`${task.title}${task.dueTime ? ` ${task.dueTime}` : ''}`}
                       >
-                        {task.dueTime && (
-                          <span className="font-medium mr-1">{task.dueTime}</span>
-                        )}
-                        {task.title}
+                        <span className="h-3 w-3 flex-shrink-0 rounded border border-current opacity-60" />
+                        <span className="min-w-0 flex-1 truncate">{task.title}</span>
+                        {task.dueTime && <span className="flex-shrink-0 tabular-nums opacity-75">{task.dueTime}</span>}
                       </div>
                     ))}
+                    {dayTasks.length > 4 && (
+                      <div className="px-1 text-[11px] text-gray-400">+{dayTasks.length - 4} 更多</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -265,8 +269,24 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
           );
         })}
       </div>
-    </>
+    </div>
   );
+}
+
+function getMonthTaskColor(task: any, index: number) {
+  if (task.priority === 'high') {
+    return 'bg-red-100 text-red-900 dark:bg-red-900/50 dark:text-red-100';
+  }
+
+  const colors = [
+    'bg-cyan-100 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-100',
+    'bg-blue-100 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100',
+    'bg-purple-100 text-purple-900 dark:bg-purple-900/50 dark:text-purple-100',
+    'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100',
+    'bg-lime-100 text-lime-900 dark:bg-lime-900/50 dark:text-lime-100',
+  ];
+
+  return colors[index % colors.length];
 }
 
 // 周视图组件
