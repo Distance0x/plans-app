@@ -21,7 +21,7 @@ import { useTaskStore } from './stores/task-store';
 import { useEffect } from 'react';
 import { cn } from './lib/utils';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'group';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'group';
 
 interface SidebarGroup {
   id: string;
@@ -130,7 +130,11 @@ function App() {
         </button>
 
         <button
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-blue-200 hover:bg-blue-500 transition-all"
+          onClick={() => setCurrentView('pomodoro')}
+          className={cn(
+            'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
+            currentView === 'pomodoro' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+          )}
           title="番茄钟"
         >
           <Clock className="w-5 h-5" />
@@ -159,7 +163,7 @@ function App() {
       </div>
 
       {/* 左侧边栏 */}
-      <div className="w-80 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border-r border-gray-200 dark:border-gray-700 flex flex-col">{currentView !== 'calendar' && (
+      <div className="w-80 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border-r border-gray-200 dark:border-gray-700 flex flex-col">{currentView !== 'calendar' && currentView !== 'pomodoro' && (
         <>
         {/* 顶部 */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -291,6 +295,16 @@ function App() {
           /* 日历视图 */
           <div className="flex-1 overflow-y-auto p-6">
             <CalendarView tasks={tasks} />
+          </div>
+        ) : currentView === 'pomodoro' ? (
+          /* 番茄钟视图 */
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                番茄钟
+              </h2>
+              <PomodoroTimer />
+            </div>
           </div>
         ) : (
           /* 任务视图 */
