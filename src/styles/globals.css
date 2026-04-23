@@ -6,16 +6,96 @@
   :root {
     --background: 249 250 251;
     --foreground: 17 24 39;
+    --primary: 59 130 246;
+    --primary-dark: 37 99 235;
+    --accent: 139 92 246;
+    --success: 34 197 94;
+    --warning: 251 146 60;
+    --danger: 239 68 68;
   }
 
   .dark {
     --background: 17 24 39;
     --foreground: 249 250 251;
+    --primary: 96 165 250;
+    --primary-dark: 59 130 246;
   }
 
   body {
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  }
+
+  * {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border border-white/20 dark:border-gray-700/50;
+  }
+
+  .card-shadow {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .card-shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, rgb(59 130 246) 0%, rgb(139 92 246) 100%);
+  }
+
+  .gradient-success {
+    background: linear-gradient(135deg, rgb(34 197 94) 0%, rgb(16 185 129) 100%);
+  }
+
+  .gradient-warning {
+    background: linear-gradient(135deg, rgb(251 146 60) 0%, rgb(251 191 36) 100%);
+  }
+
+  .gradient-danger {
+    background: linear-gradient(135deg, rgb(239 68 68) 0%, rgb(220 38 38) 100%);
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .hover-lift {
+    @apply transition-all duration-200;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.15);
   }
 }
 

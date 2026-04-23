@@ -43,9 +43,15 @@ export function TaskItem({
   }, [isFocused, setFocusedTask]);
 
   const priorityColors = {
-    high: 'text-red-500 border-red-200',
-    medium: 'text-yellow-500 border-yellow-200',
-    low: 'text-blue-500 border-blue-200',
+    high: 'bg-gradient-to-r from-red-500 to-pink-500 text-white border-0',
+    medium: 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white border-0',
+    low: 'bg-gradient-to-r from-blue-400 to-cyan-400 text-white border-0',
+  };
+
+  const priorityLabels = {
+    high: '🔥 高',
+    medium: '⚡ 中',
+    low: '💧 低',
   };
 
   return (
@@ -54,11 +60,11 @@ export function TaskItem({
       onClick={() => onSelectTask?.(task.id)}
       className={cn(
         level === 0
-          ? 'glass-card p-4 rounded-lg border backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border-white/30 shadow-md hover:shadow-lg'
-          : 'p-2 rounded-lg border border-gray-100 dark:border-gray-700 bg-white/40 dark:bg-gray-800/40',
-        'transition-all cursor-pointer',
-        selected && 'border-blue-400 bg-blue-50/80 dark:border-blue-500 dark:bg-blue-950/30',
-        isFocused && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
+          ? 'glass-effect p-5 rounded-2xl border border-white/30 dark:border-gray-700/50 shadow-lg hover:shadow-xl hover-lift'
+          : 'p-3 rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-800/60',
+        'transition-all cursor-pointer animate-fade-in',
+        selected && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-transparent shadow-xl',
+        isFocused && 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 animate-pulse',
         task.status === 'completed' && 'opacity-60'
       )}
     >
@@ -69,12 +75,12 @@ export function TaskItem({
             event.stopPropagation();
             toggleComplete(task.id);
           }}
-          className="mt-1 flex-shrink-0 hover:scale-110 transition-transform"
+          className="mt-1 flex-shrink-0 hover:scale-125 transition-transform"
         >
           {task.status === 'completed' ? (
-            <CheckCircle className="w-5 h-5 text-primary-500" />
+            <CheckCircle className="w-6 h-6 text-green-500 drop-shadow-md" />
           ) : (
-            <Circle className="w-5 h-5 text-gray-400" />
+            <Circle className="w-6 h-6 text-gray-400 hover:text-blue-500" />
           )}
         </button>
 
@@ -82,41 +88,45 @@ export function TaskItem({
         <div className="flex-1 min-w-0">
           <h3
             className={cn(
-              'font-medium text-gray-900 dark:text-white',
-              task.status === 'completed' && 'line-through text-gray-500'
+              'font-semibold text-gray-900 dark:text-white text-base',
+              task.status === 'completed' && 'line-through text-gray-500 dark:text-gray-400'
             )}
           >
             {task.title}
           </h3>
           {task.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1.5 leading-relaxed">
               {task.description}
             </p>
           )}
           {task.notes && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 whitespace-pre-wrap line-clamp-3">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 whitespace-pre-wrap line-clamp-3 leading-relaxed">
               {task.notes}
             </p>
           )}
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
             <span
               className={cn(
-                'text-xs px-2 py-1 rounded border',
+                'text-xs px-3 py-1.5 rounded-full font-medium shadow-sm',
                 priorityColors[task.priority]
               )}
             >
-              {task.priority}
+              {priorityLabels[task.priority]}
             </span>
             {task.dueDate && (
-              <span className="text-xs text-gray-500">
-                {task.dueDate}{task.dueTime ? ` ${task.dueTime}` : ''}
+              <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium">
+                📅 {task.dueDate}{task.dueTime ? ` ${task.dueTime}` : ''}
               </span>
             )}
             {task.recurrenceRule && (
-              <span className="text-xs text-purple-600">重复</span>
+              <span className="text-xs px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
+                🔄 重复
+              </span>
             )}
             {attachments.length > 0 && (
-              <span className="text-xs text-gray-500">附件 {attachments.length}</span>
+              <span className="text-xs px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
+                📎 {attachments.length}
+              </span>
             )}
           </div>
         </div>
@@ -127,9 +137,9 @@ export function TaskItem({
             event.stopPropagation();
             deleteTask(task.id);
           }}
-          className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+          className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-all hover:scale-110"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-5 h-5" />
         </button>
       </div>
 

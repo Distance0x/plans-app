@@ -213,14 +213,16 @@ function App() {
   }, [currentView, filteredTasks, selectedTaskId]);
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
       {/* 最左侧图标栏 */}
-      <div className="w-16 bg-blue-600 flex flex-col items-center py-4 space-y-4">
+      <div className="w-16 gradient-primary shadow-lg flex flex-col items-center py-4 space-y-4">
         <button
           onClick={() => setCurrentView('today')}
           className={cn(
-            'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-            !['calendar', 'pomodoro', 'search'].includes(currentView) ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            !['calendar', 'pomodoro', 'search'].includes(currentView)
+              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
+              : 'text-white/70 hover:bg-white/20 hover:text-white'
           )}
           title="任务"
         >
@@ -230,8 +232,10 @@ function App() {
         <button
           onClick={() => setCurrentView('calendar')}
           className={cn(
-            'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-            currentView === 'calendar' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            currentView === 'calendar'
+              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
+              : 'text-white/70 hover:bg-white/20 hover:text-white'
           )}
           title="日历"
         >
@@ -241,8 +245,10 @@ function App() {
         <button
           onClick={() => setCurrentView('pomodoro')}
           className={cn(
-            'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-            currentView === 'pomodoro' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            currentView === 'pomodoro'
+              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
+              : 'text-white/70 hover:bg-white/20 hover:text-white'
           )}
           title="番茄钟"
         >
@@ -250,14 +256,14 @@ function App() {
         </button>
 
         <button
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-blue-200 hover:bg-blue-500 transition-all"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white transition-all hover-lift"
           title="统计"
         >
           <Grid className="w-5 h-5" />
         </button>
 
         <button
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-blue-200 hover:bg-blue-500 transition-all"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white transition-all hover-lift"
           title="目标"
         >
           <Target className="w-5 h-5" />
@@ -269,8 +275,10 @@ function App() {
             setSelectedGroup(null);
           }}
           className={cn(
-            'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-            currentView === 'search' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            currentView === 'search'
+              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
+              : 'text-white/70 hover:bg-white/20 hover:text-white'
           )}
           title="搜索"
         >
@@ -279,11 +287,11 @@ function App() {
       </div>
 
       {/* 左侧边栏 */}
-      <div className="w-80 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border-r border-gray-200 dark:border-gray-700 flex flex-col">{currentView !== 'calendar' && currentView !== 'pomodoro' && (
+      <div className="w-80 glass-effect shadow-xl border-r border-white/20 dark:border-gray-700/50 flex flex-col">{currentView !== 'calendar' && currentView !== 'pomodoro' && (
         <>
         {/* 顶部 */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
             <CheckSquare className="w-6 h-6 text-blue-500" />
             Plans App
           </h1>
@@ -301,10 +309,10 @@ function App() {
                   setSelectedGroup(null);
                 }}
                 className={cn(
-                  'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all',
+                  'w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all hover-lift',
                   currentView === group.id && !selectedGroup
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -333,7 +341,9 @@ function App() {
                     </span>
                   )}
                 </div>
-                <span className="text-sm text-gray-500">{group.count}</span>
+                <span className="text-sm font-medium px-2 py-1 rounded-lg bg-white/20 dark:bg-gray-800/50">
+                  {group.count}
+                </span>
               </button>
             ))}
           </div>
@@ -342,7 +352,7 @@ function App() {
           <div>
             <button
               onClick={() => toggleGroup('today-tasks')}
-              className="w-full flex items-center justify-between px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              className="w-full flex items-center justify-between px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-700/30 rounded-xl transition-all"
             >
               <div className="flex items-center gap-2">
                 {expandedGroups.has('today-tasks') ? (
@@ -387,10 +397,10 @@ function App() {
                       setSelectedGroup(group.id);
                     }}
                     className={cn(
-                      'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all text-sm',
+                      'w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm hover-lift',
                       selectedGroup === group.id
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                        : 'hover:bg-gray-100/70 dark:hover:bg-gray-700/40 text-gray-700 dark:text-gray-300'
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -440,19 +450,19 @@ function App() {
         </div>
 
         {/* 底部工具 */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/30 dark:bg-gray-800/30">
           <div className="flex gap-2 mb-3">
             <button
               onClick={cycleTheme}
-              className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-300/50 dark:border-gray-600/50 text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all hover-lift"
             >
-              主题: {theme === 'light' ? '浅色' : theme === 'dark' ? '深色' : '系统'}
+              主题: {theme === 'light' ? '☀️ 浅色' : theme === 'dark' ? '🌙 深色' : '🔄 系统'}
             </button>
             <button
               onClick={() => window.electron.backup.export()}
-              className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-3 py-2 text-xs rounded-xl border border-gray-300/50 dark:border-gray-600/50 text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all hover-lift"
             >
-              导出
+              📤 导出
             </button>
             <button
               onClick={async () => {
@@ -461,16 +471,16 @@ function App() {
                   await fetchTasks();
                 }
               }}
-              className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-3 py-2 text-xs rounded-xl border border-gray-300/50 dark:border-gray-600/50 text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all hover-lift"
             >
-              导入
+              📥 导入
             </button>
           </div>
           <button
             onClick={() => setCurrentView('pomodoro')}
-            className="w-full px-3 py-2 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+            className="w-full px-4 py-3 text-sm rounded-xl gradient-primary text-white hover:shadow-lg transition-all hover-lift font-medium"
           >
-            打开番茄钟
+            🍅 打开番茄钟
           </button>
         </div>
         </>
@@ -481,15 +491,15 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {currentView === 'calendar' ? (
           /* 日历视图 */
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
             <CalendarView tasks={tasks} />
           </div>
         ) : currentView === 'pomodoro' ? (
           /* 番茄钟视图 */
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
             <div className="max-w-2xl mx-auto">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-                番茄钟
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent mb-8">
+                🍅 番茄钟
               </h2>
               <PomodoroTimer />
             </div>
@@ -499,34 +509,34 @@ function App() {
           <div className="flex flex-1 overflow-hidden">
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {/* 顶部标题栏 */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+              <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 glass-effect">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {currentView === 'today' && '今天'}
-                      {currentView === 'recent' && '最近7天'}
-                      {currentView === 'inbox' && '收集箱'}
-                      {currentView === 'search' && '搜索'}
-                      {selectedGroup === 'pending' && '待处理'}
-                      {selectedGroup === 'in-progress' && '处理中'}
-                      {selectedGroup === 'completed' && '已完成'}
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                      {currentView === 'today' && '📅 今天'}
+                      {currentView === 'recent' && '🕐 最近7天'}
+                      {currentView === 'inbox' && '📥 收集箱'}
+                      {currentView === 'search' && '🔍 搜索'}
+                      {selectedGroup === 'pending' && '🔥 待处理'}
+                      {selectedGroup === 'in-progress' && '⚡ 处理中'}
+                      {selectedGroup === 'completed' && '✅ 已完成'}
                     </h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {filteredTasks.length} 个任务
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 font-medium">
+                      共 {filteredTasks.length} 个任务
                     </p>
                   </div>
                   <button
                     onClick={() => window.dispatchEvent(new Event('focus-quick-add'))}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    className="flex items-center gap-2 px-5 py-3 gradient-primary text-white rounded-xl hover:shadow-xl transition-all hover-lift font-medium"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                     添加任务
                   </button>
                 </div>
               </div>
 
               {/* 内容区域 */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-white/30 to-gray-50/30 dark:from-gray-800/30 dark:to-gray-900/30">
                 <TaskList
                   key={currentView}
                   title={currentView === 'search' ? '搜索任务' : '今日任务'}
