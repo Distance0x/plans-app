@@ -1,10 +1,19 @@
 import { TaskList } from './components/tasks/TaskList';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
+import { Calendar } from './components/calendar/Calendar';
+import { useTaskStore } from './stores/task-store';
+import { useEffect } from 'react';
 
 function App() {
+  const { tasks, fetchTasks } = useTaskStore();
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto p-8 max-w-6xl">
+      <div className="container mx-auto p-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
             Plans App
@@ -14,7 +23,7 @@ function App() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* 番茄钟 */}
           <div className="lg:col-span-1">
             <PomodoroTimer />
@@ -24,6 +33,11 @@ function App() {
           <div className="lg:col-span-2">
             <TaskList />
           </div>
+        </div>
+
+        {/* 日历视图 */}
+        <div>
+          <Calendar tasks={tasks} />
         </div>
       </div>
     </div>
