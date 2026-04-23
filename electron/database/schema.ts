@@ -15,6 +15,10 @@ export const tasks = sqliteTable('tasks', {
   orderIndex: integer('order_index').default(0),
   estimatedPomodoros: integer('estimated_pomodoros').default(0),
   actualPomodoros: integer('actual_pomodoros').default(0),
+  // 重复规则
+  recurrenceRule: text('recurrence_rule'), // JSON string
+  recurrenceParentId: text('recurrence_parent_id'), // 原始重复任务 ID
+  recurrenceCount: integer('recurrence_count').default(0), // 已生成次数
 });
 
 export const pomodoroSessions = sqliteTable('pomodoro_sessions', {
