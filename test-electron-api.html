@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Electron API</title>
+</head>
+<body>
+  <h1>Electron API Test</h1>
+  <div id="result"></div>
+  <button onclick="testAPI()">Test Timer API</button>
+
+  <script>
+    function testAPI() {
+      const result = document.getElementById('result');
+
+      if (typeof window.electron === 'undefined') {
+        result.innerHTML = '<p style="color: red;">❌ window.electron is undefined</p>';
+        result.innerHTML += '<p>Preload script not loaded correctly!</p>';
+        return;
+      }
+
+      result.innerHTML = '<p style="color: green;">✅ window.electron is available</p>';
+      result.innerHTML += '<p>Testing timer.start()...</p>';
+
+      window.electron.timer.start()
+        .then(state => {
+          result.innerHTML += '<p style="color: green;">✅ Timer started successfully!</p>';
+          result.innerHTML += '<pre>' + JSON.stringify(state, null, 2) + '</pre>';
+        })
+        .catch(err => {
+          result.innerHTML += '<p style="color: red;">❌ Timer start failed: ' + err.message + '</p>';
+        });
+    }
+
+    // Auto test on load
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(testAPI, 1000);
+    });
+  </script>
+</body>
+</html>

@@ -46,3 +46,14 @@ export const taskTags = sqliteTable('task_tags', {
   taskId: text('task_id').notNull(),
   tagId: text('tag_id').notNull(),
 });
+
+export const reminders = sqliteTable('reminders', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull(),
+  triggerAt: text('trigger_at').notNull(),
+  type: text('type', { enum: ['due', 'before_due', 'custom'] }).default('due'),
+  channel: text('channel', { enum: ['notification', 'sound', 'both'] }).default('notification'),
+  state: text('state', { enum: ['pending', 'fired', 'cancelled'] }).default('pending'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});

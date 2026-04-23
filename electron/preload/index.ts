@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+console.log('[Preload] Script loaded successfully!');
+
 // 暴露安全的 API 到渲染进程
 contextBridge.exposeInMainWorld('electron', {
   // 任务相关 API
@@ -26,6 +28,16 @@ contextBridge.exposeInMainWorld('electron', {
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
     update: (updates: any) => ipcRenderer.invoke('settings:update', updates),
+  },
+
+  // 提醒相关 API
+  reminder: {
+    create: (taskId: string, triggerAt: string, type?: string, channel?: string) =>
+      ipcRenderer.invoke('reminder:create', taskId, triggerAt, type, channel),
+    cancel: (reminderId: string) =>
+      ipcRenderer.invoke('reminder:cancel', reminderId),
+    cancelTask: (taskId: string) =>
+      ipcRenderer.invoke('reminder:cancel-task', taskId),
   },
 
   // 事件监听

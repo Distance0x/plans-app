@@ -2,6 +2,8 @@ import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerTaskHandlers } from '../ipc/task-handler';
 import { registerTimerHandlers } from '../ipc/timer-handler';
+import { initReminderEngine, registerReminderHandlers, stopReminderEngine } from '../services/reminder-engine';
+import { initNotificationService } from '../services/notification-service';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -24,6 +26,10 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
+
+    // 调试：打印 preload 路径
+    console.log('[Main] Preload path:', path.join(__dirname, '../preload/index.js'));
+    console.log('[Main] __dirname:', __dirname);
   } else {
     // 生产环境加载打包后的文件
     mainWindow.loadFile(path.join(__dirname, '../../dist-renderer/index.html'));
@@ -38,8 +44,15 @@ app.whenReady().then(async () => {
   // 注册 IPC 处理器
   registerTaskHandlers();
   registerTimerHandlers();
+  registerReminderHandlers();
 
   createWindow();
+
+  // 初始化提醒引擎和通知服务
+  if (mainWindow) {
+    initReminderEngine(mainWindow);
+    initNotificationService(mainWindow);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -49,6 +62,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  stopReminderEngine();
   if (process.platform !== 'darwin') {
     app.quit();
   }
