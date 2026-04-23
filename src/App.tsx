@@ -230,7 +230,7 @@ function App() {
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             !['calendar', 'pomodoro', 'search'].includes(currentView)
               ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/70 hover:bg-white/20 hover:text-white'
+              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
           )}
           title="任务"
         >
@@ -243,7 +243,7 @@ function App() {
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             currentView === 'calendar'
               ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/70 hover:bg-white/20 hover:text-white'
+              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
           )}
           title="日历"
         >
@@ -256,7 +256,7 @@ function App() {
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             currentView === 'pomodoro'
               ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/70 hover:bg-white/20 hover:text-white'
+              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
           )}
           title="番茄钟"
         >
@@ -264,14 +264,14 @@ function App() {
         </button>
 
         <button
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white transition-all hover-lift"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/50 hover:bg-white/20 hover:text-white/80 transition-all hover-lift"
           title="统计"
         >
           <Grid className="w-5 h-5" />
         </button>
 
         <button
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white transition-all hover-lift"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/50 hover:bg-white/20 hover:text-white/80 transition-all hover-lift"
           title="目标"
         >
           <Target className="w-5 h-5" />
@@ -286,7 +286,7 @@ function App() {
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             currentView === 'search'
               ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/70 hover:bg-white/20 hover:text-white'
+              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
           )}
           title="搜索"
         >
@@ -325,7 +325,7 @@ function App() {
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <group.icon className="w-5 h-5" />
+                  <group.icon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                   {editingSidebarId === group.id ? (
                     <input
                       autoFocus

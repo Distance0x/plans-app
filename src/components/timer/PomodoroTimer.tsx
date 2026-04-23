@@ -164,7 +164,7 @@ export function PomodoroTimer() {
         /* 番茄钟主界面 */
         <>
           {/* 会话类型 */}
-          <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="flex items-center justify-center gap-3 mb-6">
             <div className={cn('p-3 rounded-2xl bg-gradient-to-br shadow-lg', sessionGradients[sessionType])}>
               <Timer className="w-6 h-6 text-white" />
             </div>
@@ -174,7 +174,7 @@ export function PomodoroTimer() {
           </div>
 
           {/* 倒计时显示 */}
-          <div className="relative mb-10 flex items-center justify-center">
+          <div className="relative mb-8 flex items-center justify-center">
             <div className="text-center z-10">
               <div className="text-7xl font-bold bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-3 tracking-tight">
                 {formatTime(remainingTime)}
@@ -185,7 +185,7 @@ export function PomodoroTimer() {
             </div>
 
             {/* 进度环 */}
-            <svg className="absolute w-[280px] h-[280px]" viewBox="0 0 200 200">
+            <svg className="absolute w-[280px] h-[280px] -z-10" viewBox="0 0 200 200">
               <circle
                 cx="100"
                 cy="100"
