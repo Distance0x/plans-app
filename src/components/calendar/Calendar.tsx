@@ -289,8 +289,13 @@ function getMonthTaskColor(task: any, index: number) {
   return colors[index % colors.length];
 }
 
+const RESIZE_STEP_MINUTES = 15;
+
 // 周视图组件
 function WeekView({ currentDate, tasks, updateTask }: any) {
+  const [resizePreview, setResizePreview] = useState<{ taskId: string; duration: number } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ taskId: string; startMinute: number } | null>(null);
+
   const startOfWeek = new Date(currentDate);
   startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
 
@@ -312,63 +317,109 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
     .filter((task: any) => task.dueTime)
     .map((task: any) => {
       const [hours, minutes] = task.dueTime.split(':').map(Number);
-      return hours * 60 + minutes;
+      const startMinutes = hours * 60 + minutes;
+      const duration = Number(task.duration) || 60;
+      return { start: startMinutes, end: startMinutes + duration };
     });
 
   // 动态计算显示范围
-  let startHour = 0;
-  let endHour = 24;
+  let startHour = 8;
+  let endHour = 20;
 
   if (taskTimes.length > 0) {
-    const minTime = Math.min(...taskTimes);
-    const maxTime = Math.max(...taskTimes.map((time, idx) => {
-      const task = allWeekTasks.filter((t: any) => t.dueTime)[idx];
-      return time + (Number(task?.duration) || 60);
-    }));
+    const minTime = Math.min(...taskTimes.map(t => t.start));
+    const maxTime = Math.max(...taskTimes.map(t => t.end));
 
     startHour = Math.max(0, Math.floor(minTime / 60) - 1);
     endHour = Math.min(24, Math.ceil(maxTime / 60) + 1);
   }
 
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
-  const hourHeight = Math.max(40, Math.min(80, 600 / hours.length)); // 动态高度
+  const hourHeight = Math.max(50, Math.min(80, 700 / hours.length));
+  const minuteHeight = hourHeight / 60;
+
+  const getTaskStartMinute = (task: any) => {
+    if (dragPreview && dragPreview.taskId === task.id) {
+      return dragPreview.startMinute;
+    }
+    if (!task.dueTime) return startHour * 60;
+    const [hours, minutes] = task.dueTime.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const getTaskDuration = (task: any) => {
+    if (resizePreview && resizePreview.taskId === task.id) {
+      return resizePreview.duration;
+    }
+    return Math.max(Number(task.duration) || 60, RESIZE_STEP_MINUTES);
+  };
 
   const getTaskPosition = (task: any) => {
-    if (!task.dueTime) return { top: 0, height: hourHeight };
-    const [hours, minutes] = task.dueTime.split(':').map(Number);
-    const totalMinutes = hours * 60 + minutes;
-    const relativeMinutes = totalMinutes - (startHour * 60);
+    const startMinute = getTaskStartMinute(task);
+    const duration = getTaskDuration(task);
+    const relativeMinutes = startMinute - (startHour * 60);
+    const clampedDuration = Math.min(duration, (endHour * 60) - startMinute);
+
     return {
       top: (relativeMinutes / 60) * hourHeight,
-      height: Math.max(Number(task.duration) || 60, 30) * (hourHeight / 60),
+      height: Math.max((clampedDuration / 60) * hourHeight, 30),
     };
   };
 
-  const handleTimeDrop = async (e: React.DragEvent, date: Date, hour: number) => {
+  const startDrag = (e: React.MouseEvent<HTMLDivElement>, task: any) => {
     e.preventDefault();
-    const taskId = e.dataTransfer.getData('text/plain');
-    if (!taskId) return;
+    e.stopPropagation();
 
-    const dueDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const dueTime = `${String(hour).padStart(2, '0')}:00`;
-    await updateTask(taskId, { dueDate, dueTime });
+    const startY = e.clientY;
+    const startMinute = getTaskStartMinute(task);
+
+    const handleMove = (event: MouseEvent) => {
+      const deltaY = event.clientY - startY;
+      const deltaMinutes = deltaY / minuteHeight;
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes, startHour, endHour);
+      setDragPreview({ taskId: task.id, startMinute: nextStartMinute });
+    };
+
+    const handleUp = async (event: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+
+      const deltaY = event.clientY - startY;
+      const deltaMinutes = deltaY / minuteHeight;
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes, startHour, endHour);
+      setDragPreview(null);
+      await updateTask(task.id, { dueTime: formatClock(nextStartMinute) });
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
   };
 
-  const handleTimelineDrop = async (e: React.DragEvent, date: Date) => {
+  const startResize = (e: React.MouseEvent<HTMLDivElement>, task: any) => {
     e.preventDefault();
-    const taskId = e.dataTransfer.getData('text/plain');
-    if (!taskId) return;
+    e.stopPropagation();
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const relativeMinutes = (y / hourHeight) * 60;
-    const totalMinutes = startHour * 60 + relativeMinutes;
-    const hour = Math.floor(totalMinutes / 60);
-    const minute = Math.floor(totalMinutes % 60);
+    const startY = e.clientY;
+    const startDuration = getTaskDuration(task);
 
-    const dueDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const dueTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    await updateTask(taskId, { dueDate, dueTime });
+    const handleMove = (event: MouseEvent) => {
+      const deltaMinutes = (event.clientY - startY) / minuteHeight;
+      const nextDuration = snapDuration(startDuration + deltaMinutes);
+      setResizePreview({ taskId: task.id, duration: nextDuration });
+    };
+
+    const handleUp = async (event: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+
+      const deltaMinutes = (event.clientY - startY) / minuteHeight;
+      const nextDuration = snapDuration(startDuration + deltaMinutes);
+      setResizePreview(null);
+      await updateTask(task.id, { duration: nextDuration });
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
   };
 
   const today = new Date();
@@ -383,31 +434,31 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
   const weekDayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
   return (
-    <div className="flex">
+    <div className="flex overflow-x-auto">
       {/* 时间轴 */}
-      <div className="w-16 flex-shrink-0">
+      <div className="w-16 flex-shrink-0 sticky left-0 bg-white dark:bg-gray-900 z-10">
         <div className="h-12"></div>
         {hours.map((hour) => (
-          <div key={hour} className="text-xs text-gray-500 pr-2 text-right" style={{ height: `${hourHeight}px` }}>
+          <div key={hour} className="text-xs text-gray-500 pr-2 text-right border-b border-gray-100 dark:border-gray-800" style={{ height: `${hourHeight}px`, lineHeight: `${hourHeight}px` }}>
             {String(hour).padStart(2, '0')}:00
           </div>
         ))}
       </div>
 
       {/* 日期列 */}
-      <div className="flex-1 grid grid-cols-7 gap-1">
+      <div className="flex-1 grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700">
         {weekDays.map((date, index) => {
           const dayTasks = getTasksForDay(date);
 
           return (
-            <div key={index} className="flex flex-col">
+            <div key={index} className="flex flex-col bg-white dark:bg-gray-900">
               {/* 日期头部 */}
               <div
                 className={cn(
-                  'h-12 flex flex-col items-center justify-center rounded-t-lg',
+                  'h-12 flex flex-col items-center justify-center',
                   isToday(date)
                     ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700'
+                    : 'bg-gray-50 dark:bg-gray-800'
                 )}
               >
                 <div className="text-xs">{weekDayNames[index]}</div>
@@ -415,15 +466,11 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
               </div>
 
               {/* 时间格子 */}
-              <div
-                className="relative border-l border-gray-200 dark:border-gray-600"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleTimelineDrop(e, date)}
-              >
+              <div className="relative flex-1">
                 {hours.map((hour) => (
                   <div
                     key={hour}
-                    className="border-b border-gray-100 dark:border-gray-700"
+                    className="border-b border-gray-100 dark:border-gray-800"
                     style={{ height: `${hourHeight}px` }}
                   ></div>
                 ))}
@@ -431,14 +478,15 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
                 {/* 任务卡片 */}
                 {dayTasks.map((task: any) => {
                   const pos = getTaskPosition(task);
+                  const startMinute = getTaskStartMinute(task);
+                  const duration = getTaskDuration(task);
+                  const endMinute = Math.min(startMinute + duration, endHour * 60);
+
                   return (
                     <div
                       key={task.id}
-                      draggable
-                      onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
                       className={cn(
-                        'absolute left-0 right-0 mx-1 px-2 py-1 rounded text-xs cursor-move',
-                        'overflow-hidden',
+                        'absolute left-1 right-1 px-2 py-1 rounded text-xs overflow-hidden group',
                         task.priority === 'high'
                           ? 'bg-red-100 text-red-700 border-l-2 border-red-500'
                           : task.priority === 'medium'
@@ -449,11 +497,25 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
                       style={{
                         top: `${pos.top}px`,
                         height: `${pos.height}px`,
+                        cursor: dragPreview || resizePreview ? 'default' : 'move',
                       }}
-                      title={task.title}
+                      title={`${task.title} ${formatClock(startMinute)} - ${formatClock(endMinute)}`}
+                      onMouseDown={(e) => {
+                        if (!resizePreview && !dragPreview) {
+                          startDrag(e, task);
+                        }
+                      }}
                     >
-                      <div className="font-medium">{task.dueTime || '全天'} · {task.duration || 60}m</div>
-                      <div className="truncate">{task.title}</div>
+                      <div className="font-medium truncate pointer-events-none">{formatClock(startMinute)}</div>
+                      <div className="truncate pointer-events-none">{task.title}</div>
+
+                      {/* 底部拖动手柄 */}
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize opacity-0 group-hover:opacity-100 pointer-events-auto"
+                        onMouseDown={(e) => startResize(e, task)}
+                      >
+                        <div className="mx-auto mt-0.5 h-0.5 w-8 rounded-full bg-current opacity-60" />
+                      </div>
                     </div>
                   );
                 })}

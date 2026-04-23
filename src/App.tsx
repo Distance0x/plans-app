@@ -295,15 +295,16 @@ function App() {
       </div>
 
       {/* 左侧边栏 */}
-      <div className="w-80 glass-effect shadow-xl border-r border-white/20 dark:border-gray-700/50 flex flex-col">{currentView !== 'calendar' && currentView !== 'pomodoro' && (
-        <>
-        {/* 顶部 */}
-        <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-blue-500" />
-            Plans App
-          </h1>
-        </div>
+      {currentView !== 'calendar' && currentView !== 'pomodoro' && (
+        <div className="w-80 glass-effect shadow-xl border-r border-white/20 dark:border-gray-700/50 flex flex-col">
+          <>
+          {/* 顶部 */}
+          <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
+              <CheckSquare className="w-6 h-6 text-blue-500" />
+              Plans App
+            </h1>
+          </div>
 
         {/* 侧边栏内容 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -492,23 +493,43 @@ function App() {
           </button>
         </div>
         </>
-      )}
       </div>
+      )}
 
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {currentView === 'calendar' ? (
           /* 日历视图 */
           <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
+            <div className="mb-6 flex items-center justify-between">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-3">
+                <CheckSquare className="w-8 h-8 text-blue-500" />
+                Plans App - 日历
+              </h1>
+              <button
+                onClick={() => setCurrentView('today')}
+                className="px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 transition-all"
+              >
+                返回任务
+              </button>
+            </div>
             <CalendarView tasks={tasks} />
           </div>
         ) : currentView === 'pomodoro' ? (
           /* 番茄钟视图 */
           <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
             <div className="max-w-2xl mx-auto">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent mb-8">
-                🍅 番茄钟
-              </h2>
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+                  🍅 番茄钟
+                </h2>
+                <button
+                  onClick={() => setCurrentView('today')}
+                  className="px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 transition-all"
+                >
+                  返回任务
+                </button>
+              </div>
               <PomodoroTimer />
             </div>
           </div>
