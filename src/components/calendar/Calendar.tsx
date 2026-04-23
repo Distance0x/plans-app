@@ -254,7 +254,13 @@ function MonthView({ currentDate, tasks, draggedTask, setDraggedTask, updateTask
                         )}
                         title={`${task.title}${task.dueTime ? ` ${task.dueTime}` : ''}`}
                       >
-                        <span className="h-3 w-3 flex-shrink-0 rounded border border-current opacity-60" />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateTask(task.id, { status: task.status === 'completed' ? 'todo' : 'completed' });
+                          }}
+                          className="h-3 w-3 flex-shrink-0 rounded border border-current opacity-60 hover:opacity-100 transition-opacity"
+                        />
                         <span className="min-w-0 flex-1 truncate">{task.title}</span>
                         {task.dueTime && <span className="flex-shrink-0 tabular-nums opacity-75">{task.dueTime}</span>}
                       </div>
@@ -506,7 +512,9 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
                         }
                       }}
                     >
-                      <div className="font-medium truncate pointer-events-none">{formatClock(startMinute)}</div>
+                      <div className="font-medium truncate pointer-events-none">
+                        {formatClock(startMinute)} - {formatClock(endMinute)}
+                      </div>
                       <div className="truncate pointer-events-none">{task.title}</div>
 
                       {/* 底部拖动手柄 */}

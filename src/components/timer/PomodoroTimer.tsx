@@ -174,7 +174,7 @@ export function PomodoroTimer() {
           </div>
 
           {/* 倒计时显示 */}
-          <div className="relative mb-10 flex items-center justify-center" style={{ minHeight: '280px' }}>
+          <div className="relative mb-10 flex items-center justify-center">
             <div className="text-center z-10">
               <div className="text-7xl font-bold bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-3 tracking-tight">
                 {formatTime(remainingTime)}
@@ -185,14 +185,14 @@ export function PomodoroTimer() {
             </div>
 
             {/* 进度环 */}
-            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 200" style={{ maxWidth: '280px', maxHeight: '280px' }}>
+            <svg className="absolute w-[280px] h-[280px]" viewBox="0 0 200 200">
               <circle
                 cx="100"
                 cy="100"
                 r="85"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="10"
+                strokeWidth="8"
                 className="text-gray-200 dark:text-gray-700"
               />
               <circle
@@ -200,20 +200,15 @@ export function PomodoroTimer() {
                 cy="100"
                 r="85"
                 fill="none"
-                stroke="url(#gradient)"
-                strokeWidth="10"
+                stroke="currentColor"
+                strokeWidth="8"
                 strokeLinecap="round"
+                className={cn(sessionColors[sessionType])}
                 strokeDasharray={`${2 * Math.PI * 85}`}
                 strokeDashoffset={`${2 * Math.PI * 85 * (1 - progress / 100)}`}
                 transform="rotate(-90 100 100)"
                 style={{ transition: 'stroke-dashoffset 1s linear' }}
               />
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" className={cn('stop-color-start', sessionColors[sessionType])} />
-                  <stop offset="100%" className={cn('stop-color-end', sessionColors[sessionType])} />
-                </linearGradient>
-              </defs>
             </svg>
           </div>
 
