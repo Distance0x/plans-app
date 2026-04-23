@@ -12,7 +12,6 @@ import {
   Search
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
-import { TaskForm } from './components/tasks/TaskForm';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
 import { useTaskStore } from './stores/task-store';
@@ -21,7 +20,7 @@ import { useSettingsStore, type ThemeMode } from './stores/settings-store';
 import { useEffect } from 'react';
 import { cn } from './lib/utils';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'group';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'search' | 'group';
 
 interface SidebarGroup {
   id: string;
@@ -39,7 +38,14 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('today');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['today-tasks']));
-  const [showQuickTaskForm, setShowQuickTaskForm] = useState(false);
+  const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
+  const [sidebarLabels, setSidebarLabels] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('plans-sidebar-labels') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
   useEffect(() => {
     fetchTasks();
@@ -74,7 +80,7 @@ function App() {
     const handleQuickAddTask = () => {
       setCurrentView('inbox');
       setSelectedGroup(null);
-      setShowQuickTaskForm(true);
+      window.setTimeout(() => window.dispatchEvent(new Event('focus-quick-add')), 0);
     };
 
     const handleTrayStartPomodoro = () => {
@@ -142,11 +148,17 @@ function App() {
     { id: 'completed', name: '已完成', icon: '✅', color: 'green', count: completedTasks.length },
   ];
 
-  const projectGroups = [
-    { id: 'work', name: '学习工作', icon: '🎓', color: 'gray', count: 9 },
-    { id: 'life', name: '生活', icon: '🏠', color: 'gray', count: 0 },
-    { id: 'fun', name: '娱乐', icon: '❤️', color: 'green', count: 5 },
-  ];
+  const getSidebarLabel = (id: string, fallback: string) => sidebarLabels[id] || fallback;
+
+  const updateSidebarLabel = (id: string, name: string) => {
+    const normalized = name.trim();
+    setEditingSidebarId(null);
+    if (!normalized) return;
+
+    const next = { ...sidebarLabels, [id]: normalized };
+    setSidebarLabels(next);
+    localStorage.setItem('plans-sidebar-labels', JSON.stringify(next));
+  };
 
   const toggleGroup = (groupId: string) => {
     const newExpanded = new Set(expandedGroups);
@@ -190,7 +202,7 @@ function App() {
           onClick={() => setCurrentView('today')}
           className={cn(
             'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-            currentView !== 'calendar' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+            !['calendar', 'pomodoro', 'search'].includes(currentView) ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
           )}
           title="任务"
         >
@@ -234,7 +246,14 @@ function App() {
         </button>
 
         <button
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-blue-200 hover:bg-blue-500 transition-all"
+          onClick={() => {
+            setCurrentView('search');
+            setSelectedGroup(null);
+          }}
+          className={cn(
+            'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
+            currentView === 'search' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
+          )}
           title="搜索"
         >
           <Search className="w-5 h-5" />
@@ -272,7 +291,29 @@ function App() {
               >
                 <div className="flex items-center gap-3">
                   <group.icon className="w-5 h-5" />
-                  <span className="font-medium">{group.name}</span>
+                  {editingSidebarId === group.id ? (
+                    <input
+                      autoFocus
+                      defaultValue={getSidebarLabel(group.id, group.name)}
+                      onClick={(event) => event.stopPropagation()}
+                      onBlur={(event) => updateSidebarLabel(group.id, event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') updateSidebarLabel(group.id, event.currentTarget.value);
+                        if (event.key === 'Escape') setEditingSidebarId(null);
+                      }}
+                      className="w-28 rounded border border-blue-300 bg-white px-2 py-1 text-sm text-gray-900 dark:bg-gray-900 dark:text-white"
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        setEditingSidebarId(group.id);
+                      }}
+                      className="font-medium"
+                    >
+                      {getSidebarLabel(group.id, group.name)}
+                    </span>
+                  )}
                 </div>
                 <span className="text-sm text-gray-500">{group.count}</span>
               </button>
@@ -291,9 +332,31 @@ function App() {
                 ) : (
                   <ChevronRight className="w-4 h-4" />
                 )}
-                <span className="text-sm font-medium">💪 今日任务</span>
+                {editingSidebarId === 'today-tasks' ? (
+                  <input
+                    autoFocus
+                    defaultValue={getSidebarLabel('today-tasks', '今日任务')}
+                    onClick={(event) => event.stopPropagation()}
+                    onBlur={(event) => updateSidebarLabel('today-tasks', event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') updateSidebarLabel('today-tasks', event.currentTarget.value);
+                      if (event.key === 'Escape') setEditingSidebarId(null);
+                    }}
+                    className="w-28 rounded border border-blue-300 bg-white px-2 py-1 text-sm text-gray-900 dark:bg-gray-900 dark:text-white"
+                  />
+                ) : (
+                  <span
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      setEditingSidebarId('today-tasks');
+                    }}
+                    className="text-sm font-medium"
+                  >
+                    💪 {getSidebarLabel('today-tasks', '今日任务')}
+                  </span>
+                )}
               </div>
-              <span className="text-sm text-gray-500">1</span>
+              <span className="text-sm text-gray-500">{todayTasks.length}</span>
             </button>
 
             {expandedGroups.has('today-tasks') && (
@@ -314,7 +377,28 @@ function App() {
                   >
                     <div className="flex items-center gap-2">
                       <span>{group.icon}</span>
-                      <span>{group.name}</span>
+                      {editingSidebarId === group.id ? (
+                        <input
+                          autoFocus
+                          defaultValue={getSidebarLabel(group.id, group.name)}
+                          onClick={(event) => event.stopPropagation()}
+                          onBlur={(event) => updateSidebarLabel(group.id, event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') updateSidebarLabel(group.id, event.currentTarget.value);
+                            if (event.key === 'Escape') setEditingSidebarId(null);
+                          }}
+                          className="w-24 rounded border border-blue-300 bg-white px-2 py-1 text-sm text-gray-900 dark:bg-gray-900 dark:text-white"
+                        />
+                      ) : (
+                        <span
+                          onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            setEditingSidebarId(group.id);
+                          }}
+                        >
+                          {getSidebarLabel(group.id, group.name)}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {group.count > 0 && (
@@ -335,31 +419,9 @@ function App() {
             )}
           </div>
 
-          {/* 项目分组 */}
-          <div className="space-y-1">
-            {projectGroups.map(group => (
-              <button
-                key={group.id}
-                onClick={() => toggleGroup(group.id)}
-                className="w-full flex items-center justify-between px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
-                <div className="flex items-center gap-2">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>{group.icon}</span>
-                  <span className="text-sm font-medium">{group.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {group.count > 0 && group.color === 'green' && (
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                  )}
-                  <span className="text-sm text-gray-500">{group.count}</span>
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* 底部番茄钟 */}
+        {/* 底部工具 */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex gap-2 mb-3">
             <button
@@ -386,8 +448,12 @@ function App() {
               导入
             </button>
           </div>
-          <div className="text-xs text-gray-500 mb-2">番茄钟</div>
-          <PomodoroTimer />
+          <button
+            onClick={() => setCurrentView('pomodoro')}
+            className="w-full px-3 py-2 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+          >
+            打开番茄钟
+          </button>
         </div>
         </>
       )}
@@ -421,6 +487,7 @@ function App() {
                     {currentView === 'today' && '今天'}
                     {currentView === 'recent' && '最近7天'}
                     {currentView === 'inbox' && '收集箱'}
+                    {currentView === 'search' && '搜索'}
                     {selectedGroup === 'pending' && '待处理'}
                     {selectedGroup === 'in-progress' && '处理中'}
                     {selectedGroup === 'completed' && '已完成'}
@@ -430,7 +497,7 @@ function App() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowQuickTaskForm(true)}
+                  onClick={() => window.dispatchEvent(new Event('focus-quick-add'))}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -441,20 +508,16 @@ function App() {
 
             {/* 内容区域 */}
             <div className="flex-1 overflow-y-auto p-6">
-              <TaskList />
+              <TaskList
+                key={currentView}
+                title={currentView === 'search' ? '搜索任务' : '今日任务'}
+                autoFocusSearch={currentView === 'search'}
+              />
             </div>
           </>
         )}
       </div>
 
-      {showQuickTaskForm && (
-        <TaskForm
-          onClose={async () => {
-            setShowQuickTaskForm(false);
-            await fetchTasks();
-          }}
-        />
-      )}
     </div>
   );
 }

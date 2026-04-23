@@ -56,22 +56,17 @@ async function deleteTaskCascade(db: Awaited<ReturnType<typeof getDatabase>>, id
   await db.delete(tasks).where(eq(tasks.id, id));
 }
 
-async function completeParentIfAllChildrenDone(
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  parentId: string | null
-) {
-  if (!parentId) return;
-
-  const children = await db
-    .select()
+async function completeChildTasks(db: Awaited<ReturnType<typeof getDatabase>>, parentId: string) {
+  const now = new Date().toISOString();
+  const childTasks = await db
+    .select({ id: tasks.id })
     .from(tasks)
     .where(eq(tasks.parentId, parentId));
 
-  if (children.length === 0 || children.some((child) => child.status !== 'completed')) {
-    return;
+  for (const child of childTasks) {
+    await completeChildTasks(db, child.id);
   }
 
-  const now = new Date().toISOString();
   await db
     .update(tasks)
     .set({
@@ -79,7 +74,7 @@ async function completeParentIfAllChildrenDone(
       completedAt: now,
       updatedAt: now,
     })
-    .where(eq(tasks.id, parentId));
+    .where(eq(tasks.parentId, parentId));
 }
 
 export function registerTaskHandlers() {
@@ -138,7 +133,7 @@ export function registerTaskHandlers() {
 
     if (existing.status !== 'completed' && updates.status === 'completed') {
       await RecurrenceEngine.generateNextInstance(id);
-      await completeParentIfAllChildrenDone(db, updated.parentId);
+      await completeChildTasks(db, id);
     }
 
     return updated;

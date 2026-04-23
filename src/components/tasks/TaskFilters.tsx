@@ -7,9 +7,10 @@ import { Button } from '../ui/Button';
 interface TaskFiltersProps {
   onSearch: (query: string) => void;
   onFilterChange: (filters: any) => void;
+  autoFocusSearch?: boolean;
 }
 
-export function TaskFilters({ onSearch, onFilterChange }: TaskFiltersProps) {
+export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false }: TaskFiltersProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -57,6 +58,7 @@ export function TaskFilters({ onSearch, onFilterChange }: TaskFiltersProps) {
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
+            autoFocus={autoFocusSearch}
           />
         </div>
         <Button

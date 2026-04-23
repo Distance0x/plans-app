@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useTaskStore } from '@/stores/task-store';
 import { TaskItem } from './TaskItem';
-import { TaskForm } from './TaskForm';
 import { TaskFilters } from './TaskFilters';
-import { Plus } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { QuickAddTask } from './QuickAddTask';
 
-export function TaskList() {
+interface TaskListProps {
+  title?: string;
+  autoFocusSearch?: boolean;
+}
+
+export function TaskList({ title = '今日任务', autoFocusSearch = false }: TaskListProps) {
   const { tasks, loading, error, fetchTasks, searchTasks } = useTaskStore();
-  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     fetchTasks();
@@ -45,25 +47,24 @@ export function TaskList() {
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          今日任务
+          {title}
         </h2>
-        <Button onClick={() => setShowForm(true)} size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          添加任务
-        </Button>
       </div>
 
+      <QuickAddTask />
+
       {/* 搜索和过滤 */}
-      <TaskFilters onSearch={handleSearch} onFilterChange={handleFilterChange} />
+      <TaskFilters
+        onSearch={handleSearch}
+        onFilterChange={handleFilterChange}
+        autoFocusSearch={autoFocusSearch}
+      />
 
       {/* 任务列表 */}
       {rootTasks.length === 0 ? (
         <div className="glass-card p-12 rounded-lg text-center backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border border-white/30">
           <p className="text-gray-500 mb-4">还没有任务</p>
-          <Button onClick={() => setShowForm(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            创建第一个任务
-          </Button>
+          <p className="text-sm text-gray-400">在上方输入任务标题，按 Enter 创建</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -72,9 +73,6 @@ export function TaskList() {
           ))}
         </div>
       )}
-
-      {/* 任务表单 */}
-      {showForm && <TaskForm onClose={() => setShowForm(false)} />}
     </div>
   );
 }

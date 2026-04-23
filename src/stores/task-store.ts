@@ -162,11 +162,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     if (!task) return;
 
     const newStatus = task.status === 'completed' ? 'todo' : 'completed';
-    const updated = await get().updateTask(id, { status: newStatus });
-
-    if (updated?.parentId) {
-      await get().fetchTasks();
-    }
+    await get().updateTask(id, { status: newStatus });
+    await get().fetchTasks();
   },
 
   searchTasks: async (query) => {

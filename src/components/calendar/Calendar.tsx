@@ -400,8 +400,13 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
   );
 }
 
+const HOUR_HEIGHT = 66;
+const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
+const RESIZE_STEP_MINUTES = 15;
+
 // 日视图组件
 function DayView({ currentDate, tasks, updateTask }: any) {
+  const [resizePreview, setResizePreview] = useState<{ taskId: string; duration: number } | null>(null);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
@@ -418,114 +423,186 @@ function DayView({ currentDate, tasks, updateTask }: any) {
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  const getTasksForHour = (hour: number) => {
-    return sortedTasks.filter((task: any) => {
-      if (!task.dueTime) return hour === 0;
-      const [taskHour] = task.dueTime.split(':').map(Number);
-      return taskHour === hour;
-    });
+  const getTaskStartMinute = (task: any) => {
+    if (!task.dueTime) return 0;
+    const [hour, minute] = task.dueTime.split(':').map(Number);
+    return hour * 60 + minute;
   };
 
-  const handleTimeDrop = async (e: React.DragEvent, hour: number) => {
+  const getTaskDuration = (task: any) => {
+    const preview = resizePreview;
+    if (preview && preview.taskId === task.id) {
+      return preview.duration;
+    }
+
+    return Math.max(Number(task.duration) || 60, RESIZE_STEP_MINUTES);
+  };
+
+  const getTaskColor = (task: any, index: number) => {
+    const palette = [
+      'bg-rose-100/90 border-rose-200 text-rose-900 dark:bg-rose-900/40 dark:border-rose-800 dark:text-rose-100',
+      'bg-blue-300/80 border-blue-400 text-blue-950 dark:bg-blue-800/70 dark:border-blue-700 dark:text-blue-100',
+      'bg-cyan-200/80 border-cyan-300 text-cyan-950 dark:bg-cyan-900/60 dark:border-cyan-800 dark:text-cyan-100',
+      'bg-lime-200/80 border-lime-300 text-lime-950 dark:bg-lime-900/50 dark:border-lime-800 dark:text-lime-100',
+    ];
+
+    if (task.priority === 'high') return palette[0];
+    if (task.priority === 'medium') return palette[index % palette.length];
+    return palette[(index + 2) % palette.length];
+  };
+
+  const getTimeAtDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = Math.max(0, e.clientY - rect.top);
+    const rawMinutes = y / MINUTE_HEIGHT;
+    const snapped = Math.round(rawMinutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
+    return Math.min(23 * 60 + 45, Math.max(0, snapped));
+  };
+
+  const handleTimeDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('text/plain');
     if (!taskId) return;
 
+    const startMinute = getTimeAtDrop(e);
     await updateTask(taskId, {
       dueDate: dateStr,
-      dueTime: `${String(hour).padStart(2, '0')}:00`,
+      dueTime: formatClock(startMinute),
     });
+  };
+
+  const startResize = (e: React.MouseEvent<HTMLDivElement>, task: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startY = e.clientY;
+    const startDuration = getTaskDuration(task);
+
+    const handleMove = (event: MouseEvent) => {
+      const deltaMinutes = (event.clientY - startY) / MINUTE_HEIGHT;
+      const nextDuration = snapDuration(startDuration + deltaMinutes);
+      setResizePreview({ taskId: task.id, duration: nextDuration });
+    };
+
+    const handleUp = async (event: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+
+      const deltaMinutes = (event.clientY - startY) / MINUTE_HEIGHT;
+      const nextDuration = snapDuration(startDuration + deltaMinutes);
+      setResizePreview(null);
+      await updateTask(task.id, { duration: nextDuration });
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
   };
 
   const weekDayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const dayOfWeek = currentDate.getDay();
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full">
       {/* 日期头部 */}
-      <div className="mb-6 text-center">
-        <div className="text-4xl font-bold text-blue-500 mb-2">{day}</div>
-        <div className="text-lg text-gray-600 dark:text-gray-300">
+      <div className="mb-4 text-center border-b border-gray-100 dark:border-gray-700 pb-4">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           {weekDayNames[dayOfWeek]}
+        </div>
+        <div className="mx-auto mt-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-lg font-semibold text-white">
+          {day}
         </div>
       </div>
 
-      {/* 任务列表 */}
-      <div className="space-y-6">
-        {hours.map((hour) => {
-          const hourTasks = getTasksForHour(hour);
-          return (
-            <div key={hour} className="flex gap-4">
-              {/* 时间标签 */}
-              <div className="w-20 flex-shrink-0 text-right">
-                <div className="text-sm text-gray-500">
-                  {String(hour).padStart(2, '0')}:00
-                </div>
-              </div>
+      <div className="flex">
+        <div className="w-20 flex-shrink-0 pr-3">
+          {hours.map((hour) => (
+            <div
+              key={hour}
+              className="relative text-right text-sm text-gray-500 dark:text-gray-400"
+              style={{ height: `${HOUR_HEIGHT}px` }}
+            >
+              <span className="relative -top-2">
+                {hour === 12 ? '正午' : `${String(hour).padStart(2, '0')}:00`}
+              </span>
+            </div>
+          ))}
+        </div>
 
-              {/* 任务卡片 */}
+        <div
+          className="relative flex-1 rounded-lg bg-white/40 dark:bg-gray-900/30"
+          style={{ height: `${24 * HOUR_HEIGHT}px` }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleTimeDrop}
+        >
+          {hours.map((hour) => (
+            <div
+              key={hour}
+              className="absolute left-0 right-0 border-t border-gray-100 dark:border-gray-800"
+              style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+            />
+          ))}
+
+          {sortedTasks.map((task: any, index: number) => {
+            const startMinute = getTaskStartMinute(task);
+            const duration = getTaskDuration(task);
+            const endMinute = Math.min(startMinute + duration, 24 * 60);
+
+            return (
               <div
+                key={task.id}
+                draggable={!resizePreview}
+                onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
                 className={cn(
-                  'flex-1 min-h-[60px] space-y-2 rounded-lg border border-transparent p-1',
-                  hourTasks.length === 0 && 'border-dashed border-gray-200 dark:border-gray-700'
+                  'absolute left-1 right-1 rounded-md border px-3 py-2 shadow-sm cursor-move overflow-hidden group',
+                  'transition-shadow hover:shadow-md',
+                  getTaskColor(task, index),
+                  task.status === 'completed' && 'opacity-60'
                 )}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleTimeDrop(e, hour)}
+                style={{
+                  top: `${startMinute * MINUTE_HEIGHT}px`,
+                  height: `${Math.max(duration * MINUTE_HEIGHT, 28)}px`,
+                }}
+                title={`${task.title} ${formatClock(startMinute)} - ${formatClock(endMinute)}`}
               >
-                {hourTasks.map((task: any) => (
-                  <div
-                    key={task.id}
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
-                    className={cn(
-                      'p-4 rounded-lg border-l-4 cursor-move transition-all',
-                      'hover:shadow-md',
-                      task.priority === 'high'
-                        ? 'bg-red-50 border-red-500 dark:bg-red-900/20'
-                        : task.priority === 'medium'
-                        ? 'bg-yellow-50 border-yellow-500 dark:bg-yellow-900/20'
-                        : 'bg-blue-50 border-blue-500 dark:bg-blue-900/20',
-                      task.status === 'completed' && 'opacity-50'
-                    )}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                            {task.dueTime || '全天'} · {task.duration || 60}m
-                          </span>
-                          {task.status === 'completed' && (
-                            <span className="text-xs text-green-600">✓ 已完成</span>
-                          )}
-                        </div>
-                        <div
-                          className={cn(
-                            'text-base font-medium',
-                            task.status === 'completed' && 'line-through'
-                          )}
-                        >
-                          {task.title}
-                        </div>
-                        {task.description && (
-                          <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                            {task.description}
-                          </div>
-                        )}
-                      </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-1 h-4 w-4 flex-shrink-0 rounded border border-current opacity-70" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{task.title}</div>
+                    <div className="text-sm opacity-75">
+                      {formatClock(startMinute)} - {formatClock(endMinute)}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+                </div>
 
-        {sortedTasks.length === 0 && (
-          <div className="text-center py-20 text-gray-400">
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-3 cursor-row-resize opacity-0 group-hover:opacity-100"
+                  onMouseDown={(e) => startResize(e, task)}
+                >
+                  <div className="mx-auto mt-1 h-1 w-12 rounded-full bg-current opacity-40" />
+                </div>
+              </div>
+            );
+          })}
+
+          {sortedTasks.length === 0 && (
+            <div className="absolute inset-x-0 top-20 text-center text-gray-400">
             今天没有安排任务
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+function formatClock(totalMinutes: number) {
+  const safeMinutes = Math.max(0, Math.min(totalMinutes, 24 * 60));
+  const hour = Math.floor(safeMinutes / 60);
+  const minute = safeMinutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function snapDuration(minutes: number) {
+  const snapped = Math.round(minutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
+  return Math.max(RESIZE_STEP_MINUTES, Math.min(12 * 60, snapped));
 }
