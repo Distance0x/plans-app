@@ -163,56 +163,53 @@ export function PomodoroTimer() {
       ) : (
         /* 番茄钟主界面 */
         <>
-          {/* 倒计时显示 */}
-          <div className="relative mb-8 flex flex-col items-center justify-center">
-            {/* 会话类型 - 移到进度环外面 */}
-            <div className="flex items-center justify-center gap-3 mb-6 z-20">
-              <div className={cn('p-3 rounded-2xl bg-gradient-to-br shadow-lg', sessionGradients[sessionType])}>
-                <Timer className="w-6 h-6 text-white" />
+          {/* 会话类型 - 顶部 */}
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <div className={cn('p-3 rounded-2xl bg-gradient-to-br shadow-lg', sessionGradients[sessionType])}>
+              <Timer className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {sessionLabels[sessionType]}
+            </h3>
+          </div>
+
+          {/* 倒计时和进度环 - 中间 */}
+          <div className="relative mb-8 flex items-center justify-center" style={{ height: '280px' }}>
+            <div className="text-center z-10">
+              <div className="text-7xl font-bold bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-3 tracking-tight">
+                {formatTime(remainingTime)}
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {sessionLabels[sessionType]}
-              </h3>
+              <div className="text-base text-gray-600 dark:text-gray-400 font-medium">
+                已完成 <span className="text-red-500 font-bold">{completedPomodoros}</span> 个番茄钟 🍅
+              </div>
             </div>
 
-            {/* 进度环和时间 */}
-            <div className="relative flex items-center justify-center">
-              <div className="text-center z-10">
-                <div className="text-7xl font-bold bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-3 tracking-tight">
-                  {formatTime(remainingTime)}
-                </div>
-                <div className="text-base text-gray-600 dark:text-gray-400 font-medium">
-                  已完成 <span className="text-red-500 font-bold">{completedPomodoros}</span> 个番茄钟 🍅
-                </div>
-              </div>
-
-              {/* 进度环 */}
-              <svg className="absolute w-[280px] h-[280px] -z-10" viewBox="0 0 200 200">
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="85"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-gray-200 dark:text-gray-700"
-                />
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="85"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  className={cn(sessionColors[sessionType])}
-                  strokeDasharray={`${2 * Math.PI * 85}`}
-                  strokeDashoffset={`${2 * Math.PI * 85 * (1 - progress / 100)}`}
-                  transform="rotate(-90 100 100)"
-                  style={{ transition: 'stroke-dashoffset 1s linear' }}
-                />
-              </svg>
-            </div>
+            {/* 进度环 */}
+            <svg className="absolute w-[280px] h-[280px]" viewBox="0 0 200 200" style={{ zIndex: 0 }}>
+              <circle
+                cx="100"
+                cy="100"
+                r="85"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="8"
+                className="text-gray-200 dark:text-gray-700"
+              />
+              <circle
+                cx="100"
+                cy="100"
+                r="85"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="8"
+                strokeLinecap="round"
+                className={cn(sessionColors[sessionType])}
+                strokeDasharray={`${2 * Math.PI * 85}`}
+                strokeDashoffset={`${2 * Math.PI * 85 * (1 - progress / 100)}`}
+                transform="rotate(-90 100 100)"
+                style={{ transition: 'stroke-dashoffset 1s linear' }}
+              />
+            </svg>
           </div>
 
           {/* 控制按钮 */}
