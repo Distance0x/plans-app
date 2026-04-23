@@ -7,9 +7,18 @@ import { SubTaskList } from './SubTaskList';
 interface TaskItemProps {
   task: Task;
   level?: number;
+  selected?: boolean;
+  selectedTaskId?: string | null;
+  onSelectTask?: (taskId: string) => void;
 }
 
-export function TaskItem({ task, level = 0 }: TaskItemProps) {
+export function TaskItem({
+  task,
+  level = 0,
+  selected = false,
+  selectedTaskId,
+  onSelectTask,
+}: TaskItemProps) {
   const itemRef = useRef<HTMLDivElement>(null);
   const {
     tasks,
@@ -42,11 +51,13 @@ export function TaskItem({ task, level = 0 }: TaskItemProps) {
   return (
     <div
       ref={itemRef}
+      onClick={() => onSelectTask?.(task.id)}
       className={cn(
         level === 0
           ? 'glass-card p-4 rounded-lg border backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border-white/30 shadow-md hover:shadow-lg'
           : 'p-2 rounded-lg border border-gray-100 dark:border-gray-700 bg-white/40 dark:bg-gray-800/40',
-        'transition-all',
+        'transition-all cursor-pointer',
+        selected && 'border-blue-400 bg-blue-50/80 dark:border-blue-500 dark:bg-blue-950/30',
         isFocused && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
         task.status === 'completed' && 'opacity-60'
       )}
@@ -54,7 +65,10 @@ export function TaskItem({ task, level = 0 }: TaskItemProps) {
       <div className="flex items-start gap-3">
         {/* 完成按钮 */}
         <button
-          onClick={() => toggleComplete(task.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleComplete(task.id);
+          }}
           className="mt-1 flex-shrink-0 hover:scale-110 transition-transform"
         >
           {task.status === 'completed' ? (
@@ -109,7 +123,10 @@ export function TaskItem({ task, level = 0 }: TaskItemProps) {
 
         {/* 删除按钮 */}
         <button
-          onClick={() => deleteTask(task.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            deleteTask(task.id);
+          }}
           className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
         >
           <Trash2 className="w-4 h-4" />
@@ -132,7 +149,13 @@ export function TaskItem({ task, level = 0 }: TaskItemProps) {
             onToggleSubTask={toggleComplete}
             onDeleteSubTask={deleteTask}
             renderSubTask={(subTask) => (
-              <TaskItem task={subTask as Task} level={level + 1} />
+              <TaskItem
+                task={subTask as Task}
+                level={level + 1}
+                selected={selectedTaskId === subTask.id}
+                selectedTaskId={selectedTaskId}
+                onSelectTask={onSelectTask}
+              />
             )}
           />
         </div>

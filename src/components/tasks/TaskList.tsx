@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useTaskStore } from '@/stores/task-store';
+import { useTaskStore, type Task } from '@/stores/task-store';
 import { TaskItem } from './TaskItem';
 import { TaskFilters } from './TaskFilters';
 import { QuickAddTask } from './QuickAddTask';
@@ -7,9 +7,18 @@ import { QuickAddTask } from './QuickAddTask';
 interface TaskListProps {
   title?: string;
   autoFocusSearch?: boolean;
+  visibleTasks?: Task[];
+  selectedTaskId?: string | null;
+  onSelectTask?: (taskId: string) => void;
 }
 
-export function TaskList({ title = '今日任务', autoFocusSearch = false }: TaskListProps) {
+export function TaskList({
+  title = '今日任务',
+  autoFocusSearch = false,
+  visibleTasks,
+  selectedTaskId,
+  onSelectTask,
+}: TaskListProps) {
   const { tasks, loading, error, fetchTasks, searchTasks } = useTaskStore();
 
   useEffect(() => {
@@ -24,7 +33,8 @@ export function TaskList({ title = '今日任务', autoFocusSearch = false }: Ta
     await fetchTasks(filters);
   };
 
-  const rootTasks = tasks.filter((task) => !task.parentId);
+  const sourceTasks = visibleTasks || tasks;
+  const rootTasks = sourceTasks.filter((task) => !task.parentId);
 
   if (loading && tasks.length === 0) {
     return (
@@ -69,7 +79,13 @@ export function TaskList({ title = '今日任务', autoFocusSearch = false }: Ta
       ) : (
         <div className="space-y-3">
           {rootTasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
+            <TaskItem
+              key={task.id}
+              task={task}
+              selected={selectedTaskId === task.id}
+              selectedTaskId={selectedTaskId}
+              onSelectTask={onSelectTask}
+            />
           ))}
         </div>
       )}

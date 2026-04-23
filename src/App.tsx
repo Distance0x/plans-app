@@ -12,6 +12,7 @@ import {
   Search
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
+import { TaskDetailPanel } from './components/tasks/TaskDetailPanel';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
 import { useTaskStore } from './stores/task-store';
@@ -37,6 +38,7 @@ function App() {
   const { theme, loadSettings, updateSettings } = useSettingsStore();
   const [currentView, setCurrentView] = useState<ViewType>('today');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['today-tasks']));
   const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
   const [sidebarLabels, setSidebarLabels] = useState<Record<string, string>>(() => {
@@ -193,6 +195,22 @@ function App() {
     }
     return tasks;
   };
+
+  const filteredTasks = getFilteredTasks();
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) || filteredTasks[0] || null;
+
+  useEffect(() => {
+    if (currentView === 'calendar' || currentView === 'pomodoro') return;
+
+    if (filteredTasks.length === 0) {
+      if (selectedTaskId) setSelectedTaskId(null);
+      return;
+    }
+
+    if (!selectedTaskId || !filteredTasks.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId(filteredTasks[0].id);
+    }
+  }, [currentView, filteredTasks, selectedTaskId]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -478,43 +496,49 @@ function App() {
           </div>
         ) : (
           /* 任务视图 */
-          <>
-            {/* 顶部标题栏 */}
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {currentView === 'today' && '今天'}
-                    {currentView === 'recent' && '最近7天'}
-                    {currentView === 'inbox' && '收集箱'}
-                    {currentView === 'search' && '搜索'}
-                    {selectedGroup === 'pending' && '待处理'}
-                    {selectedGroup === 'in-progress' && '处理中'}
-                    {selectedGroup === 'completed' && '已完成'}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {getFilteredTasks().length} 个任务
-                  </p>
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              {/* 顶部标题栏 */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {currentView === 'today' && '今天'}
+                      {currentView === 'recent' && '最近7天'}
+                      {currentView === 'inbox' && '收集箱'}
+                      {currentView === 'search' && '搜索'}
+                      {selectedGroup === 'pending' && '待处理'}
+                      {selectedGroup === 'in-progress' && '处理中'}
+                      {selectedGroup === 'completed' && '已完成'}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {filteredTasks.length} 个任务
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => window.dispatchEvent(new Event('focus-quick-add'))}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    添加任务
+                  </button>
                 </div>
-                <button
-                  onClick={() => window.dispatchEvent(new Event('focus-quick-add'))}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  添加任务
-                </button>
+              </div>
+
+              {/* 内容区域 */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <TaskList
+                  key={currentView}
+                  title={currentView === 'search' ? '搜索任务' : '今日任务'}
+                  autoFocusSearch={currentView === 'search'}
+                  visibleTasks={filteredTasks}
+                  selectedTaskId={selectedTaskId}
+                  onSelectTask={setSelectedTaskId}
+                />
               </div>
             </div>
-
-            {/* 内容区域 */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <TaskList
-                key={currentView}
-                title={currentView === 'search' ? '搜索任务' : '今日任务'}
-                autoFocusSearch={currentView === 'search'}
-              />
-            </div>
-          </>
+            <TaskDetailPanel task={selectedTask} />
+          </div>
         )}
       </div>
 
