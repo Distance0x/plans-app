@@ -12,13 +12,11 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
-  const [tab, setTab] = useState<'write' | 'preview'>('write');
 
   useEffect(() => {
     setTitle(task?.title || '');
     setDescription(task?.description || '');
     setNotes(task?.notes || '');
-    setTab('write');
   }, [task?.id]);
 
   const statusLabel = useMemo(() => {
@@ -144,34 +142,14 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Markdown 内容</label>
-              <div className="rounded-md bg-gray-100 p-0.5 text-xs dark:bg-gray-800">
-                <button
-                  onClick={() => setTab('write')}
-                  className={cn('rounded px-2 py-1', tab === 'write' && 'bg-white shadow-sm dark:bg-gray-700')}
-                >
-                  编辑
-                </button>
-                <button
-                  onClick={() => setTab('preview')}
-                  className={cn('rounded px-2 py-1', tab === 'preview' && 'bg-white shadow-sm dark:bg-gray-700')}
-                >
-                  预览
-                </button>
-              </div>
-            </div>
-            {tab === 'write' ? (
-              <textarea
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">笔记</label>
+            <div className="relative">
+              <MarkdownEditor
                 value={notes}
-                onChange={(event) => setNotes(event.target.value)}
+                onChange={setNotes}
                 onBlur={saveTextFields}
-                placeholder="# 标题&#10;- 待办&#10;**重点**"
-                className="min-h-[280px] w-full resize-none rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
-            ) : (
-              <MarkdownPreview markdown={notes} />
-            )}
+            </div>
           </div>
 
           <div className="text-xs text-gray-400">
@@ -183,19 +161,55 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
   );
 }
 
-function MarkdownPreview({ markdown }: { markdown: string }) {
-  const lines = markdown.split('\n');
+interface MarkdownEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+}
 
-  if (!markdown.trim()) {
+function MarkdownEditor({ value, onChange, onBlur }: MarkdownEditorProps) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  if (!isFocused && value.trim()) {
     return (
-      <div className="min-h-[280px] rounded-md border border-dashed border-gray-200 p-4 text-sm text-gray-400 dark:border-gray-700">
-        暂无内容
+      <div
+        onClick={() => setIsFocused(true)}
+        className="min-h-[280px] cursor-text rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+      >
+        <MarkdownPreview markdown={value} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-[280px] space-y-2 rounded-md border border-gray-200 bg-white p-4 text-sm leading-6 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        setIsFocused(false);
+        onBlur();
+      }}
+      onFocus={() => setIsFocused(true)}
+      autoFocus={isFocused}
+      placeholder="# 标题&#10;&#10;## 子标题&#10;&#10;- 列表项&#10;- [ ] 待办事项&#10;- [x] 已完成&#10;&#10;**粗体** *斜体* `代码`&#10;&#10;> 引用文本"
+      className="min-h-[280px] w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+    />
+  );
+}
+
+function MarkdownPreview({ markdown }: { markdown: string }) {
+  const lines = markdown.split('\n');
+
+  if (!markdown.trim()) {
+    return (
+      <div className="text-sm text-gray-400">
+        点击编辑笔记...
+      </div>
+    );
+  }
+
+  return (
+    <div className="prose prose-sm dark:prose-invert max-w-none">
       {lines.map((line, index) => renderMarkdownLine(line, index))}
     </div>
   );
@@ -203,54 +217,118 @@ function MarkdownPreview({ markdown }: { markdown: string }) {
 
 function renderMarkdownLine(line: string, index: number) {
   if (!line.trim()) {
-    return <div key={index} className="h-3" />;
+    return <div key={index} className="h-4" />;
   }
 
+  // 标题
+  if (line.startsWith('#### ')) {
+    return <h4 key={index} className="text-sm font-semibold text-gray-900 dark:text-white mt-3 mb-1">{renderInlineMarkdown(line.slice(5))}</h4>;
+  }
   if (line.startsWith('### ')) {
-    return <h3 key={index} className="text-base font-semibold">{renderInlineMarkdown(line.slice(4))}</h3>;
+    return <h3 key={index} className="text-base font-semibold text-gray-900 dark:text-white mt-4 mb-2">{renderInlineMarkdown(line.slice(4))}</h3>;
   }
-
   if (line.startsWith('## ')) {
-    return <h2 key={index} className="text-lg font-semibold">{renderInlineMarkdown(line.slice(3))}</h2>;
+    return <h2 key={index} className="text-lg font-bold text-gray-900 dark:text-white mt-5 mb-2">{renderInlineMarkdown(line.slice(3))}</h2>;
   }
-
   if (line.startsWith('# ')) {
-    return <h1 key={index} className="text-xl font-bold">{renderInlineMarkdown(line.slice(2))}</h1>;
+    return <h1 key={index} className="text-xl font-bold text-gray-900 dark:text-white mt-6 mb-3">{renderInlineMarkdown(line.slice(2))}</h1>;
   }
 
-  if (line.startsWith('- ') || line.startsWith('* ')) {
+  // 待办事项
+  if (line.match(/^- \[ \] /)) {
     return (
-      <div key={index} className="flex gap-2">
-        <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400" />
-        <span>{renderInlineMarkdown(line.slice(2))}</span>
+      <div key={index} className="flex gap-2 items-start my-1">
+        <input type="checkbox" disabled className="mt-1 h-4 w-4 rounded border-gray-300" />
+        <span className="text-gray-700 dark:text-gray-300">{renderInlineMarkdown(line.slice(6))}</span>
+      </div>
+    );
+  }
+  if (line.match(/^- \[x\] /)) {
+    return (
+      <div key={index} className="flex gap-2 items-start my-1">
+        <input type="checkbox" disabled checked className="mt-1 h-4 w-4 rounded border-gray-300" />
+        <span className="text-gray-500 dark:text-gray-400 line-through">{renderInlineMarkdown(line.slice(6))}</span>
       </div>
     );
   }
 
+  // 无序列表
+  if (line.match(/^[-*] /)) {
+    return (
+      <div key={index} className="flex gap-2 items-start my-1">
+        <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
+        <span className="text-gray-700 dark:text-gray-300">{renderInlineMarkdown(line.slice(2))}</span>
+      </div>
+    );
+  }
+
+  // 有序列表
+  if (line.match(/^\d+\. /)) {
+    const match = line.match(/^(\d+)\. (.+)$/);
+    if (match) {
+      return (
+        <div key={index} className="flex gap-2 items-start my-1">
+          <span className="text-blue-600 dark:text-blue-400 font-medium min-w-[1.5rem]">{match[1]}.</span>
+          <span className="text-gray-700 dark:text-gray-300">{renderInlineMarkdown(match[2])}</span>
+        </div>
+      );
+    }
+  }
+
+  // 引用
   if (line.startsWith('> ')) {
     return (
-      <blockquote key={index} className="border-l-2 border-blue-300 pl-3 text-gray-500">
+      <blockquote key={index} className="border-l-4 border-blue-400 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic bg-blue-50/50 dark:bg-blue-900/10">
         {renderInlineMarkdown(line.slice(2))}
       </blockquote>
     );
   }
 
-  return <p key={index}>{renderInlineMarkdown(line)}</p>;
+  // 代码块
+  if (line.startsWith('```')) {
+    return <div key={index} className="text-xs text-gray-500 font-mono">```</div>;
+  }
+
+  // 分隔线
+  if (line.match(/^---+$/) || line.match(/^\*\*\*+$/)) {
+    return <hr key={index} className="my-4 border-gray-300 dark:border-gray-600" />;
+  }
+
+  // 普通段落
+  return <p key={index} className="text-gray-700 dark:text-gray-300 my-1 leading-relaxed">{renderInlineMarkdown(line)}</p>;
 }
 
 function renderInlineMarkdown(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  // 处理粗体、斜体、代码、链接
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[([^\]]+)\]\(([^)]+)\))/g);
 
   return parts.map((part, index) => {
+    // 粗体
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>;
+      return <strong key={index} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
     }
 
+    // 斜体
+    if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+      return <em key={index} className="italic text-gray-700 dark:text-gray-300">{part.slice(1, -1)}</em>;
+    }
+
+    // 行内代码
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code key={index} className="rounded bg-gray-100 px-1 py-0.5 text-xs dark:bg-gray-700">
+        <code key={index} className="rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs font-mono text-red-600 dark:text-red-400">
           {part.slice(1, -1)}
         </code>
+      );
+    }
+
+    // 链接
+    const linkMatch = part.match(/\[([^\]]+)\]\(([^)]+)\)/);
+    if (linkMatch) {
+      return (
+        <a key={index} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+          {linkMatch[1]}
+        </a>
       );
     }
 

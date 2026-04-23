@@ -123,15 +123,21 @@ function App() {
   // 计算任务数量
   const todayTasks = tasks.filter(t => {
     const today = new Date().toISOString().split('T')[0];
-    return t.dueDate === today;
+    return t.dueDate === today && t.status !== 'completed';
   });
 
   const recentTasks = tasks.filter(t => {
+    if (!t.dueDate) return false;
     const today = new Date();
+    const taskDate = new Date(t.dueDate);
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
-    return t.dueDate && new Date(t.dueDate) >= sevenDaysAgo;
+    const sevenDaysLater = new Date(today);
+    sevenDaysLater.setDate(today.getDate() + 7);
+    return taskDate >= sevenDaysAgo && taskDate <= sevenDaysLater;
   });
+
+  const inboxTasks = tasks; // 收集箱显示所有任务
 
   const pendingTasks = tasks.filter(t => t.status === 'todo');
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
@@ -141,7 +147,7 @@ function App() {
   const sidebarGroups: SidebarGroup[] = [
     { id: 'today', name: '今天', icon: Calendar, color: 'blue', count: todayTasks.length },
     { id: 'recent', name: '最近7天', icon: Clock, color: 'gray', count: recentTasks.length },
-    { id: 'inbox', name: '收集箱', icon: Inbox, color: 'gray', count: tasks.length },
+    { id: 'inbox', name: '收集箱', icon: Inbox, color: 'gray', count: inboxTasks.length },
   ];
 
   const todayTaskGroups = [
@@ -186,6 +192,8 @@ function App() {
       return todayTasks;
     } else if (currentView === 'recent') {
       return recentTasks;
+    } else if (currentView === 'inbox') {
+      return inboxTasks;
     } else if (selectedGroup === 'pending') {
       return pendingTasks;
     } else if (selectedGroup === 'in-progress') {

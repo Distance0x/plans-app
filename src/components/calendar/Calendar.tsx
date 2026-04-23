@@ -301,20 +301,46 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
     weekDays.push(day);
   }
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-
   const getTasksForDay = (date: Date) => {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     return tasks.filter((task: any) => task.dueDate === dateStr);
   };
 
+  // 计算所有任务的时间范围
+  const allWeekTasks = weekDays.flatMap(getTasksForDay);
+  const taskTimes = allWeekTasks
+    .filter((task: any) => task.dueTime)
+    .map((task: any) => {
+      const [hours, minutes] = task.dueTime.split(':').map(Number);
+      return hours * 60 + minutes;
+    });
+
+  // 动态计算显示范围
+  let startHour = 0;
+  let endHour = 24;
+
+  if (taskTimes.length > 0) {
+    const minTime = Math.min(...taskTimes);
+    const maxTime = Math.max(...taskTimes.map((time, idx) => {
+      const task = allWeekTasks.filter((t: any) => t.dueTime)[idx];
+      return time + (Number(task?.duration) || 60);
+    }));
+
+    startHour = Math.max(0, Math.floor(minTime / 60) - 1);
+    endHour = Math.min(24, Math.ceil(maxTime / 60) + 1);
+  }
+
+  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+  const hourHeight = Math.max(40, Math.min(80, 600 / hours.length)); // 动态高度
+
   const getTaskPosition = (task: any) => {
-    if (!task.dueTime) return { top: 0, height: 60 };
+    if (!task.dueTime) return { top: 0, height: hourHeight };
     const [hours, minutes] = task.dueTime.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes;
+    const relativeMinutes = totalMinutes - (startHour * 60);
     return {
-      top: totalMinutes,
-      height: Math.max(Number(task.duration) || 60, 30),
+      top: (relativeMinutes / 60) * hourHeight,
+      height: Math.max(Number(task.duration) || 60, 30) * (hourHeight / 60),
     };
   };
 
@@ -325,6 +351,23 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
 
     const dueDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const dueTime = `${String(hour).padStart(2, '0')}:00`;
+    await updateTask(taskId, { dueDate, dueTime });
+  };
+
+  const handleTimelineDrop = async (e: React.DragEvent, date: Date) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const relativeMinutes = (y / hourHeight) * 60;
+    const totalMinutes = startHour * 60 + relativeMinutes;
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = Math.floor(totalMinutes % 60);
+
+    const dueDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const dueTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     await updateTask(taskId, { dueDate, dueTime });
   };
 
@@ -345,7 +388,7 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
       <div className="w-16 flex-shrink-0">
         <div className="h-12"></div>
         {hours.map((hour) => (
-          <div key={hour} className="h-[60px] text-xs text-gray-500 pr-2 text-right">
+          <div key={hour} className="text-xs text-gray-500 pr-2 text-right" style={{ height: `${hourHeight}px` }}>
             {String(hour).padStart(2, '0')}:00
           </div>
         ))}
@@ -372,13 +415,16 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
               </div>
 
               {/* 时间格子 */}
-              <div className="relative border-l border-gray-200 dark:border-gray-600">
+              <div
+                className="relative border-l border-gray-200 dark:border-gray-600"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleTimelineDrop(e, date)}
+              >
                 {hours.map((hour) => (
                   <div
                     key={hour}
-                    className="h-[60px] border-b border-gray-100 dark:border-gray-700"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleTimeDrop(e, date, hour)}
+                    className="border-b border-gray-100 dark:border-gray-700"
+                    style={{ height: `${hourHeight}px` }}
                   ></div>
                 ))}
 
@@ -420,13 +466,10 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
   );
 }
 
-const HOUR_HEIGHT = 66;
-const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
-const RESIZE_STEP_MINUTES = 15;
-
 // 日视图组件
 function DayView({ currentDate, tasks, updateTask }: any) {
   const [resizePreview, setResizePreview] = useState<{ taskId: string; duration: number } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ taskId: string; startMinute: number } | null>(null);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
@@ -441,10 +484,37 @@ function DayView({ currentDate, tasks, updateTask }: any) {
     return timeA.localeCompare(timeB);
   });
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  // 计算动态时间范围
+  const taskTimes = sortedTasks
+    .filter((task: any) => task.dueTime)
+    .map((task: any) => {
+      const [hour, minute] = task.dueTime.split(':').map(Number);
+      return hour * 60 + minute;
+    });
+
+  let startHour = 0;
+  let endHour = 24;
+
+  if (taskTimes.length > 0) {
+    const minTime = Math.min(...taskTimes);
+    const maxTime = Math.max(...taskTimes.map((time, idx) => {
+      const task = sortedTasks.filter((t: any) => t.dueTime)[idx];
+      return time + (Number(task?.duration) || 60);
+    }));
+
+    startHour = Math.max(0, Math.floor(minTime / 60) - 1);
+    endHour = Math.min(24, Math.ceil(maxTime / 60) + 1);
+  }
+
+  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+  const DYNAMIC_HOUR_HEIGHT = Math.max(50, Math.min(100, 800 / hours.length));
+  const DYNAMIC_MINUTE_HEIGHT = DYNAMIC_HOUR_HEIGHT / 60;
 
   const getTaskStartMinute = (task: any) => {
-    if (!task.dueTime) return 0;
+    if (dragPreview && dragPreview.taskId === task.id) {
+      return dragPreview.startMinute;
+    }
+    if (!task.dueTime) return startHour * 60;
     const [hour, minute] = task.dueTime.split(':').map(Number);
     return hour * 60 + minute;
   };
@@ -471,12 +541,10 @@ function DayView({ currentDate, tasks, updateTask }: any) {
     return palette[(index + 2) % palette.length];
   };
 
-  const getTimeAtDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = Math.max(0, e.clientY - rect.top);
-    const rawMinutes = y / MINUTE_HEIGHT;
+  const getTimeAtPosition = (y: number) => {
+    const rawMinutes = (y / DYNAMIC_HOUR_HEIGHT) * 60 + startHour * 60;
     const snapped = Math.round(rawMinutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
-    return Math.min(23 * 60 + 45, Math.max(0, snapped));
+    return Math.min((endHour - 1) * 60 + 45, Math.max(startHour * 60, snapped));
   };
 
   const handleTimeDrop = async (e: React.DragEvent<HTMLDivElement>) => {
@@ -484,11 +552,43 @@ function DayView({ currentDate, tasks, updateTask }: any) {
     const taskId = e.dataTransfer.getData('text/plain');
     if (!taskId) return;
 
-    const startMinute = getTimeAtDrop(e);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const startMinute = getTimeAtPosition(y);
+
     await updateTask(taskId, {
       dueDate: dateStr,
       dueTime: formatClock(startMinute),
     });
+  };
+
+  const startDrag = (e: React.MouseEvent<HTMLDivElement>, task: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startY = e.clientY;
+    const startMinute = getTaskStartMinute(task);
+
+    const handleMove = (event: MouseEvent) => {
+      const deltaY = event.clientY - startY;
+      const deltaMinutes = (deltaY / DYNAMIC_MINUTE_HEIGHT);
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes);
+      setDragPreview({ taskId: task.id, startMinute: nextStartMinute });
+    };
+
+    const handleUp = async (event: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+
+      const deltaY = event.clientY - startY;
+      const deltaMinutes = (deltaY / DYNAMIC_MINUTE_HEIGHT);
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes);
+      setDragPreview(null);
+      await updateTask(task.id, { dueTime: formatClock(nextStartMinute) });
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
   };
 
   const startResize = (e: React.MouseEvent<HTMLDivElement>, task: any) => {
@@ -499,7 +599,7 @@ function DayView({ currentDate, tasks, updateTask }: any) {
     const startDuration = getTaskDuration(task);
 
     const handleMove = (event: MouseEvent) => {
-      const deltaMinutes = (event.clientY - startY) / MINUTE_HEIGHT;
+      const deltaMinutes = (event.clientY - startY) / DYNAMIC_MINUTE_HEIGHT;
       const nextDuration = snapDuration(startDuration + deltaMinutes);
       setResizePreview({ taskId: task.id, duration: nextDuration });
     };
@@ -508,7 +608,7 @@ function DayView({ currentDate, tasks, updateTask }: any) {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
 
-      const deltaMinutes = (event.clientY - startY) / MINUTE_HEIGHT;
+      const deltaMinutes = (event.clientY - startY) / DYNAMIC_MINUTE_HEIGHT;
       const nextDuration = snapDuration(startDuration + deltaMinutes);
       setResizePreview(null);
       await updateTask(task.id, { duration: nextDuration });
@@ -539,7 +639,7 @@ function DayView({ currentDate, tasks, updateTask }: any) {
             <div
               key={hour}
               className="relative text-right text-sm text-gray-500 dark:text-gray-400"
-              style={{ height: `${HOUR_HEIGHT}px` }}
+              style={{ height: `${DYNAMIC_HOUR_HEIGHT}px` }}
             >
               <span className="relative -top-2">
                 {hour === 12 ? '正午' : `${String(hour).padStart(2, '0')}:00`}
@@ -550,7 +650,7 @@ function DayView({ currentDate, tasks, updateTask }: any) {
 
         <div
           className="relative flex-1 rounded-lg bg-white/40 dark:bg-gray-900/30"
-          style={{ height: `${24 * HOUR_HEIGHT}px` }}
+          style={{ height: `${hours.length * DYNAMIC_HOUR_HEIGHT}px` }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleTimeDrop}
         >
@@ -558,33 +658,38 @@ function DayView({ currentDate, tasks, updateTask }: any) {
             <div
               key={hour}
               className="absolute left-0 right-0 border-t border-gray-100 dark:border-gray-800"
-              style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+              style={{ top: `${(hour - startHour) * DYNAMIC_HOUR_HEIGHT}px`, height: `${DYNAMIC_HOUR_HEIGHT}px` }}
             />
           ))}
 
           {sortedTasks.map((task: any, index: number) => {
             const startMinute = getTaskStartMinute(task);
             const duration = getTaskDuration(task);
-            const endMinute = Math.min(startMinute + duration, 24 * 60);
+            const endMinute = Math.min(startMinute + duration, endHour * 60);
+            const relativeStartMinute = startMinute - (startHour * 60);
 
             return (
               <div
                 key={task.id}
-                draggable={!resizePreview}
-                onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
                 className={cn(
-                  'absolute left-1 right-1 rounded-md border px-3 py-2 shadow-sm cursor-move overflow-hidden group',
+                  'absolute left-1 right-1 rounded-md border px-3 py-2 shadow-sm overflow-hidden group',
                   'transition-shadow hover:shadow-md',
                   getTaskColor(task, index),
                   task.status === 'completed' && 'opacity-60'
                 )}
                 style={{
-                  top: `${startMinute * MINUTE_HEIGHT}px`,
-                  height: `${Math.max(duration * MINUTE_HEIGHT, 28)}px`,
+                  top: `${relativeStartMinute * DYNAMIC_MINUTE_HEIGHT}px`,
+                  height: `${Math.max(duration * DYNAMIC_MINUTE_HEIGHT, 28)}px`,
+                  cursor: dragPreview || resizePreview ? 'default' : 'move',
                 }}
                 title={`${task.title} ${formatClock(startMinute)} - ${formatClock(endMinute)}`}
+                onMouseDown={(e) => {
+                  if (!resizePreview && !dragPreview) {
+                    startDrag(e, task);
+                  }
+                }}
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2 pointer-events-none">
                   <span className="mt-1 h-4 w-4 flex-shrink-0 rounded border border-current opacity-70" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{task.title}</div>
@@ -595,7 +700,7 @@ function DayView({ currentDate, tasks, updateTask }: any) {
                 </div>
 
                 <div
-                  className="absolute bottom-0 left-0 right-0 h-3 cursor-row-resize opacity-0 group-hover:opacity-100"
+                  className="absolute bottom-0 left-0 right-0 h-3 cursor-row-resize opacity-0 group-hover:opacity-100 pointer-events-auto"
                   onMouseDown={(e) => startResize(e, task)}
                 >
                   <div className="mx-auto mt-1 h-1 w-12 rounded-full bg-current opacity-40" />
@@ -625,4 +730,9 @@ function formatClock(totalMinutes: number) {
 function snapDuration(minutes: number) {
   const snapped = Math.round(minutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
   return Math.max(RESIZE_STEP_MINUTES, Math.min(12 * 60, snapped));
+}
+
+function snapToGrid(minutes: number) {
+  const snapped = Math.round(minutes / RESIZE_STEP_MINUTES) * RESIZE_STEP_MINUTES;
+  return Math.max(0, Math.min(24 * 60 - RESIZE_STEP_MINUTES, snapped));
 }
