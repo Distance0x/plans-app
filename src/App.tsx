@@ -594,6 +594,7 @@ function App() {
                   visibleTasks={filteredTasks}
                   selectedTaskId={selectedTaskId}
                   onSelectTask={setSelectedTaskId}
+                  quickAddDefaultToNow={currentView === 'today' && !selectedGroup}
                 />
               </div>
             </div>

@@ -1,5 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { CalendarDays, Flag, Paperclip, Plus, X } from 'lucide-react';
+import {
+  AlarmClock,
+  CalendarDays,
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Flag,
+  Moon,
+  Paperclip,
+  Plus,
+  Repeat,
+  Sunrise,
+  Sun,
+} from 'lucide-react';
 import { useTaskStore } from '@/stores/task-store';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +23,37 @@ const priorityOptions = [
   { value: 'low', label: '低', className: 'text-blue-500 bg-blue-50 border-blue-100' },
 ] as const;
 
-export function QuickAddTask() {
+interface QuickAddTaskProps {
+  defaultToNow?: boolean;
+}
+
+type DatePanelMode = 'date' | 'duration';
+
+const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
+
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatTimeValue(date: Date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function getCalendarDays(monthDate: Date) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const startDate = new Date(year, month, 1 - mondayOffset);
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return date;
+  });
+}
+
+export function QuickAddTask({ defaultToNow = false }: QuickAddTaskProps) {
   const { createTask, fetchTasks } = useTaskStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
@@ -19,6 +63,8 @@ export function QuickAddTask() {
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [attachments, setAttachments] = useState<string[]>([]);
   const [openPanel, setOpenPanel] = useState<'date' | 'priority' | null>(null);
+  const [datePanelMode, setDatePanelMode] = useState<DatePanelMode>('date');
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
   useEffect(() => {
     const handleFocus = () => inputRef.current?.focus();
@@ -30,11 +76,17 @@ export function QuickAddTask() {
     const normalizedTitle = title.trim();
     if (!normalizedTitle) return;
 
+    const now = new Date();
+    const fallbackDueDate = defaultToNow ? formatDateKey(now) : '';
+    const fallbackDueTime = defaultToNow ? formatTimeValue(now) : '';
+    const taskDueDate = dueDate || fallbackDueDate;
+    const taskDueTime = dueTime || (taskDueDate ? fallbackDueTime : '');
+
     await createTask({
       title: normalizedTitle,
       priority,
-      dueDate,
-      dueTime,
+      dueDate: taskDueDate,
+      dueTime: taskDueTime,
       duration: Number(duration) || 60,
       attachments,
     });
@@ -42,6 +94,40 @@ export function QuickAddTask() {
     setTitle('');
     setAttachments([]);
   };
+
+  const openDatePanel = () => {
+    if (openPanel === 'date') {
+      setOpenPanel(null);
+      return;
+    }
+
+    if (defaultToNow && !dueDate && !dueTime) {
+      const now = new Date();
+      setDueDate(formatDateKey(now));
+      setDueTime(formatTimeValue(now));
+      setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    }
+
+    setDatePanelMode('date');
+    setOpenPanel('date');
+  };
+
+  const selectDate = (date: Date) => {
+    setDueDate(formatDateKey(date));
+    setCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+  };
+
+  const selectQuickDate = (offsetDays: number, time?: string) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    selectDate(date);
+    if (time) setDueTime(time);
+  };
+
+  const selectedDate = dueDate || (defaultToNow ? formatDateKey(new Date()) : '');
+  const calendarDays = getCalendarDays(calendarMonth);
+  const todayKey = formatDateKey(new Date());
+  const monthLabel = `${calendarMonth.getFullYear()}年${String(calendarMonth.getMonth() + 1).padStart(2, '0')}月`;
 
   return (
     <div className="relative">
@@ -63,7 +149,7 @@ export function QuickAddTask() {
 
         <button
           type="button"
-          onClick={() => setOpenPanel(openPanel === 'date' ? null : 'date')}
+          onClick={openDatePanel}
           className={cn(
             'rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700',
             (dueDate || dueTime) && 'text-blue-600'
@@ -99,48 +185,175 @@ export function QuickAddTask() {
       </div>
 
       {openPanel === 'date' && (
-        <div className="absolute right-0 top-12 z-30 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="font-medium text-gray-900 dark:text-white">日期与时间段</div>
-            <button onClick={() => setOpenPanel(null)} className="text-gray-400 hover:text-gray-600">
-              <X className="h-4 w-4" />
+        <div className="absolute right-0 top-12 z-30 w-[300px] rounded-xl border border-gray-100 bg-white p-3 shadow-2xl dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-3 grid grid-cols-2 rounded-lg bg-gray-100 p-0.5 text-sm dark:bg-gray-700">
+            <button
+              type="button"
+              onClick={() => setDatePanelMode('date')}
+              className={cn(
+                'rounded-md py-2 font-medium text-gray-500 transition-colors',
+                datePanelMode === 'date' && 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+              )}
+            >
+              日期
+            </button>
+            <button
+              type="button"
+              onClick={() => setDatePanelMode('duration')}
+              className={cn(
+                'rounded-md py-2 font-medium text-gray-500 transition-colors',
+                datePanelMode === 'duration' && 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+              )}
+            >
+              时间段
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-              <span>日期</span>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-2 py-2 dark:border-gray-600 dark:bg-gray-900"
-              />
-            </label>
-            <label className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-              <span>开始</span>
+
+          {datePanelMode === 'date' ? (
+            <>
+              <div className="mb-3 grid grid-cols-4 gap-2 text-gray-500">
+                {[
+                  { icon: Sun, title: '今天', onClick: () => selectQuickDate(0) },
+                  { icon: Sunrise, title: '明天上午', onClick: () => selectQuickDate(1, '09:00') },
+                  { icon: CalendarPlus, title: '一周后', onClick: () => selectQuickDate(7) },
+                  { icon: Moon, title: '今晚', onClick: () => selectQuickDate(0, '20:00') },
+                ].map((item) => (
+                  <button
+                    key={item.title}
+                    type="button"
+                    onClick={item.onClick}
+                    title={item.title}
+                    className="flex h-9 items-center justify-center rounded-lg hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-700"
+                  >
+                    <item.icon className="h-6 w-6" />
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-base font-medium text-gray-900 dark:text-white">{monthLabel}</div>
+                <div className="flex items-center gap-1 text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                    className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="上个月"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMonth(new Date())}
+                    className="h-6 w-6 rounded-md text-base leading-none hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="回到今天"
+                  >
+                    ∘
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                    className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="下个月"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-y-1 text-center">
+                {weekDays.map((day) => (
+                  <div key={day} className="py-0.5 text-xs text-gray-400">
+                    {day}
+                  </div>
+                ))}
+                {calendarDays.map((date) => {
+                  const dateKey = formatDateKey(date);
+                  const isSelected = dateKey === selectedDate;
+                  const isThisMonth = date.getMonth() === calendarMonth.getMonth();
+                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+                  return (
+                    <button
+                      key={dateKey}
+                      type="button"
+                      onClick={() => selectDate(date)}
+                      className={cn(
+                        'relative mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors',
+                        isThisMonth ? 'text-gray-900 dark:text-white' : 'text-gray-300 dark:text-gray-600',
+                        dateKey === todayKey && !isSelected && 'text-blue-600',
+                        isSelected && 'bg-blue-500 font-semibold text-white shadow-md'
+                      )}
+                    >
+                      {date.getDate()}
+                      {isWeekend && !isSelected && (
+                        <span className="absolute right-0 top-0 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-400 text-[8px] leading-none text-white">
+                          休
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3 py-1">
+              <label className="block space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                <span>开始时间</span>
+                <input
+                  type="time"
+                  value={dueTime}
+                  onChange={(event) => setDueTime(event.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </label>
+              <label className="block space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                <span>时间段（分钟）</span>
+                <input
+                  type="number"
+                  min="15"
+                  step="15"
+                  value={duration}
+                  onChange={(event) => setDuration(event.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </label>
+            </div>
+          )}
+
+          <div className="mt-3 divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+            <label className="flex h-10 items-center gap-3 text-gray-600 dark:text-gray-300">
+              <Clock className="h-5 w-5" />
+              <span className="flex-1">时间</span>
               <input
                 type="time"
                 value={dueTime}
                 onChange={(event) => setDueTime(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-2 py-2 dark:border-gray-600 dark:bg-gray-900"
+                className="w-24 rounded-md border border-transparent bg-transparent px-1 py-1 text-right text-gray-700 outline-none hover:border-gray-200 dark:text-gray-200 dark:hover:border-gray-600"
               />
+              <ChevronRight className="h-4 w-4 text-gray-400" />
             </label>
-            <label className="col-span-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-              <span>时长（分钟）</span>
-              <input
-                type="number"
-                min="15"
-                step="15"
-                value={duration}
-                onChange={(event) => setDuration(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-2 py-2 dark:border-gray-600 dark:bg-gray-900"
-              />
-            </label>
+            <button
+              type="button"
+              className="flex h-10 w-full items-center gap-3 text-left text-gray-600 dark:text-gray-300"
+            >
+              <AlarmClock className="h-5 w-5" />
+              <span className="flex-1">提醒</span>
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </button>
+            <button
+              type="button"
+              className="flex h-10 w-full items-center gap-3 text-left text-gray-600 dark:text-gray-300"
+            >
+              <Repeat className="h-5 w-5" />
+              <span className="flex-1">重复</span>
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </button>
           </div>
-          <div className="mt-4 flex gap-2">
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
             <button
               onClick={() => setOpenPanel(null)}
-              className="flex-1 rounded-md bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+              className="rounded-lg bg-blue-500 px-3 py-2.5 font-medium text-white hover:bg-blue-600"
             >
               确定
             </button>
@@ -150,7 +363,7 @@ export function QuickAddTask() {
                 setDueTime('');
                 setDuration('60');
               }}
-              className="rounded-md border border-gray-300 px-3 py-2 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="rounded-lg border border-gray-300 px-3 py-2.5 font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               清除
             </button>

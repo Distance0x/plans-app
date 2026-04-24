@@ -10,6 +10,7 @@ interface TaskListProps {
   visibleTasks?: Task[];
   selectedTaskId?: string | null;
   onSelectTask?: (taskId: string) => void;
+  quickAddDefaultToNow?: boolean;
 }
 
 export function TaskList({
@@ -18,6 +19,7 @@ export function TaskList({
   visibleTasks,
   selectedTaskId,
   onSelectTask,
+  quickAddDefaultToNow = false,
 }: TaskListProps) {
   const { tasks, loading, error, fetchTasks, searchTasks } = useTaskStore();
 
@@ -61,7 +63,7 @@ export function TaskList({
         </h2>
       </div>
 
-      <QuickAddTask />
+      <QuickAddTask defaultToNow={quickAddDefaultToNow} />
 
       {/* 搜索和过滤 */}
       <TaskFilters
