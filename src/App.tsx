@@ -541,10 +541,31 @@ function App() {
               <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 glass-effect">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                      {currentView === 'today' && '📅 今天'}
-                      {currentView === 'recent' && '🕐 最近7天'}
-                      {currentView === 'inbox' && '📥 收集箱'}
+                    <h2 className="flex items-center gap-3 text-3xl font-bold">
+                      {currentView === 'today' && (
+                        <>
+                          <Calendar className="w-8 h-8 text-blue-500 dark:text-blue-400" />
+                          <span className="bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                            今天
+                          </span>
+                        </>
+                      )}
+                      {currentView === 'recent' && (
+                        <>
+                          <Clock className="w-8 h-8 text-blue-500 dark:text-blue-400" />
+                          <span className="bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                            最近7天
+                          </span>
+                        </>
+                      )}
+                      {currentView === 'inbox' && (
+                        <>
+                          <Inbox className="w-8 h-8 text-blue-500 dark:text-blue-400" />
+                          <span className="bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                            收集箱
+                          </span>
+                        </>
+                      )}
                       {currentView === 'search' && '🔍 搜索'}
                       {selectedGroup === 'pending' && '🔥 待处理'}
                       {selectedGroup === 'in-progress' && '⚡ 处理中'}
