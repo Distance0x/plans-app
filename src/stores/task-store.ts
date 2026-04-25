@@ -36,6 +36,7 @@ export interface Task {
 export interface TaskInput extends Omit<Partial<Task>, 'attachments'> {
   attachments?: string[] | string | null;
   reminderAt?: string;
+  reminderOffsets?: number[];
   reminderChannel?: 'notification' | 'sound' | 'both';
   tagIds?: string[];
 }
@@ -195,15 +196,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       if (!window.electron) {
         throw new Error('Electron API not available');
       }
-      const { reminderAt, reminderChannel, ...taskData } = data;
+      const { reminderAt, reminderOffsets, reminderChannel, ...taskData } = data;
       const task = await window.electron.task.create(taskData);
-      const effectiveReminderAt = reminderAt || getDefaultReminderAt(data);
 
-      if (effectiveReminderAt) {
+      for (const reminder of getReminderRequests({ ...data, reminderAt, reminderOffsets })) {
         await window.electron.reminder.create(
           task.id,
-          new Date(effectiveReminderAt).toISOString(),
-          reminderAt ? 'custom' : 'before_due',
+          reminder.triggerAt,
+          reminder.type,
           reminderChannel || 'notification'
         );
       }
@@ -225,21 +225,27 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       if (!window.electron) {
         throw new Error('Electron API not available');
       }
-      const { reminderAt, reminderChannel, ...taskUpdates } = updates;
+      const { reminderAt, reminderOffsets, reminderChannel, ...taskUpdates } = updates;
       const updated = await window.electron.task.update(id, taskUpdates);
 
-      if ('reminderAt' in updates || 'dueDate' in updates || 'dueTime' in updates) {
+      if (
+        'reminderAt' in updates ||
+        'reminderOffsets' in updates ||
+        'dueDate' in updates ||
+        'dueTime' in updates
+      ) {
         await window.electron.reminder.cancelTask(id);
-        const effectiveReminderAt = reminderAt || getDefaultReminderAt({
+
+        for (const reminder of getReminderRequests({
           ...updated,
           ...updates,
-        });
-
-        if (effectiveReminderAt) {
+          reminderAt,
+          reminderOffsets,
+        })) {
           await window.electron.reminder.create(
             id,
-            new Date(effectiveReminderAt).toISOString(),
-            reminderAt ? 'custom' : 'before_due',
+            reminder.triggerAt,
+            reminder.type,
             reminderChannel || 'notification'
           );
         }
@@ -309,15 +315,42 @@ if (window.electron) {
   });
 }
 
-function getDefaultReminderAt(data: TaskInput) {
-  if (!data.dueDate || !data.dueTime) return '';
+function getReminderRequests(data: TaskInput) {
+  const requests: Array<{ triggerAt: string; type: 'due' | 'before_due' | 'custom' }> = [];
+  const seen = new Set<string>();
 
-  const dueAt = new Date(`${data.dueDate}T${data.dueTime}`);
-  if (Number.isNaN(dueAt.getTime())) return '';
+  if (data.dueDate && data.dueTime) {
+    const dueAt = new Date(`${data.dueDate}T${data.dueTime}`);
+    if (!Number.isNaN(dueAt.getTime())) {
+      const offsets = data.reminderOffsets ?? [15];
+      for (const offsetMinutes of offsets) {
+        const triggerAt = new Date(dueAt.getTime() - offsetMinutes * 60_000);
+        if (triggerAt.getTime() <= Date.now()) continue;
 
-  const triggerAt = new Date(dueAt.getTime() - 15 * 60 * 1000);
-  if (triggerAt.getTime() <= Date.now()) return '';
+        const iso = triggerAt.toISOString();
+        if (seen.has(iso)) continue;
 
-  const offsetMs = triggerAt.getTimezoneOffset() * 60_000;
-  return new Date(triggerAt.getTime() - offsetMs).toISOString().slice(0, 16);
+        seen.add(iso);
+        requests.push({
+          triggerAt: iso,
+          type: offsetMinutes === 0 ? 'due' : 'before_due',
+        });
+      }
+    }
+  }
+
+  if (data.reminderAt) {
+    const customAt = new Date(data.reminderAt);
+    if (!Number.isNaN(customAt.getTime()) && customAt.getTime() > Date.now()) {
+      const iso = customAt.toISOString();
+      if (!seen.has(iso)) {
+        requests.push({
+          triggerAt: iso,
+          type: 'custom',
+        });
+      }
+    }
+  }
+
+  return requests;
 }

@@ -14,3 +14,12 @@ dist-electron/
 *.njsproj
 *.sln
 *.sw?
+
+# Local research / experimental artifacts
+滴答清单 与 plans-app 的功能与技术采纳研究报告.md
+docs/07-吉祥物集成指南.md
+docs/09-长崎素世实现指南.md
+src/TestApp.tsx
+src/components/mascot/
+src/hooks/
+test.html

@@ -39,6 +39,24 @@ function parseAttachments(value?: string | null) {
   }
 }
 
+const reminderOffsetOptions = [
+  { value: 0, label: '准时' },
+  { value: 5, label: '提前 5 分钟' },
+  { value: 15, label: '提前 15 分钟' },
+  { value: 30, label: '提前 30 分钟' },
+  { value: 1440, label: '提前 1 天' },
+];
+
+const weekDayOptions = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 0, label: '周日' },
+];
+
 export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
   const { tasks, lists, tags, fetchLists, fetchTags, createTag, createTask, updateTask } = useTaskStore();
   const existingTask = taskId ? tasks.find((t) => t.id === taskId) : null;
@@ -58,9 +76,11 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
     notes: existingTask?.notes || '',
     attachments: parseAttachments(existingTask?.attachments),
     reminderAt: '',
+    reminderOffsets: [15],
     reminderChannel: 'notification',
     recurrenceFrequency: existingRule?.frequency || 'none',
     recurrenceInterval: String(existingRule?.interval || 1),
+    recurrenceDaysOfWeek: existingRule?.daysOfWeek || [],
     recurrenceEndDate: existingRule?.endDate || '',
     recurrenceCount: existingRule?.count ? String(existingRule.count) : '',
   });
@@ -76,16 +96,37 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
     if (!taskId || !window.electron?.reminder) return;
 
     window.electron.reminder.listTask(taskId).then((reminders) => {
-      const [reminder] = reminders;
-      if (!reminder) return;
+      if (reminders.length === 0) return;
+
+      const dueAt =
+        existingTask?.dueDate && existingTask?.dueTime
+          ? new Date(`${existingTask.dueDate}T${existingTask.dueTime}`)
+          : null;
+      const offsets = new Set<number>();
+      let customReminderAt = '';
+      let channel = reminders[0]?.channel || 'notification';
+
+      for (const reminder of reminders) {
+        channel = reminder.channel || channel;
+        if (reminder.type === 'custom' || !dueAt || Number.isNaN(dueAt.getTime())) {
+          if (!customReminderAt) customReminderAt = toLocalDateTimeValue(reminder.triggerAt);
+          continue;
+        }
+
+        const offset = Math.round((dueAt.getTime() - new Date(reminder.triggerAt).getTime()) / 60_000);
+        if (reminderOffsetOptions.some((option) => option.value === offset)) {
+          offsets.add(offset);
+        }
+      }
 
       setFormData((current) => ({
         ...current,
-        reminderAt: toLocalDateTimeValue(reminder.triggerAt),
-        reminderChannel: reminder.channel || 'notification',
+        reminderAt: customReminderAt,
+        reminderOffsets: offsets.size > 0 ? Array.from(offsets) : current.reminderOffsets,
+        reminderChannel: channel,
       }));
     });
-  }, [taskId]);
+  }, [existingTask?.dueDate, existingTask?.dueTime, taskId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +148,10 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
         : {
             frequency: formData.recurrenceFrequency as RecurrenceRule['frequency'],
             interval: Math.max(1, Number(formData.recurrenceInterval) || 1),
+            daysOfWeek:
+              formData.recurrenceFrequency === 'weekly' && formData.recurrenceDaysOfWeek.length > 0
+                ? formData.recurrenceDaysOfWeek
+                : undefined,
             endDate: formData.recurrenceEndDate || undefined,
             count: formData.recurrenceCount ? Number(formData.recurrenceCount) : undefined,
           };
@@ -124,6 +169,7 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
       attachments: formData.attachments,
       parentId: parentId ?? existingTask?.parentId ?? undefined,
       reminderAt: formData.reminderAt,
+      reminderOffsets: formData.reminderOffsets,
       reminderChannel: formData.reminderChannel as 'notification' | 'sound' | 'both',
       recurrenceRule: recurrenceRule ? JSON.stringify(recurrenceRule) : null,
     };
@@ -296,11 +342,47 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
           </div>
 
           <Input
-            label="提醒时间"
+            label="自定义提醒时间"
             type="datetime-local"
             value={formData.reminderAt}
             onChange={(e) => setFormData({ ...formData, reminderAt: e.target.value })}
           />
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              相对截止时间提醒
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {reminderOffsetOptions.map((option) => {
+                const selected = formData.reminderOffsets.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={!formData.dueDate || !formData.dueTime}
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        reminderOffsets: selected
+                          ? formData.reminderOffsets.filter((value) => value !== option.value)
+                          : [...formData.reminderOffsets, option.value].sort((a, b) => b - a),
+                      })
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      selected
+                        ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/50'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-400">
+              需要设置截止日期和截止时间后才会生效。
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Select
@@ -325,20 +407,56 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
           </div>
 
           {formData.recurrenceFrequency !== 'none' && (
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="结束日期"
-                type="date"
-                value={formData.recurrenceEndDate}
-                onChange={(e) => setFormData({ ...formData, recurrenceEndDate: e.target.value })}
-              />
-              <Input
-                label="重复次数"
-                type="number"
-                min="1"
-                value={formData.recurrenceCount}
-                onChange={(e) => setFormData({ ...formData, recurrenceCount: e.target.value })}
-              />
+            <div className="space-y-4">
+              {formData.recurrenceFrequency === 'weekly' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    每周重复日期
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {weekDayOptions.map((day) => {
+                      const selected = formData.recurrenceDaysOfWeek.includes(day.value);
+                      return (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              recurrenceDaysOfWeek: selected
+                                ? formData.recurrenceDaysOfWeek.filter((value) => value !== day.value)
+                                : [...formData.recurrenceDaysOfWeek, day.value],
+                            })
+                          }
+                          className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                            selected
+                              ? 'border-purple-500 bg-purple-50 text-purple-600 dark:bg-purple-950/50'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="结束日期"
+                  type="date"
+                  value={formData.recurrenceEndDate}
+                  onChange={(e) => setFormData({ ...formData, recurrenceEndDate: e.target.value })}
+                />
+                <Input
+                  label="重复次数"
+                  type="number"
+                  min="1"
+                  value={formData.recurrenceCount}
+                  onChange={(e) => setFormData({ ...formData, recurrenceCount: e.target.value })}
+                />
+              </div>
             </div>
           )}
 

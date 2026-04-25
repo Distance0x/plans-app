@@ -18,6 +18,7 @@ import {
 import { TaskList } from './components/tasks/TaskList';
 import { TaskDetailPanel } from './components/tasks/TaskDetailPanel';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
+import { FocusStats } from './components/timer/FocusStats';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
 // import { MascotWidget } from './components/mascot';
 import { useTaskStore } from './stores/task-store';
@@ -26,7 +27,7 @@ import { useSettingsStore, type ThemeMode } from './stores/settings-store';
 import { useEffect } from 'react';
 import { cn } from './lib/utils';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'search' | 'group' | 'list' | 'tag';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag';
 
 interface SidebarGroup {
   id: string;
@@ -49,7 +50,6 @@ function App() {
   const [newListName, setNewListName] = useState('');
   const [listPendingDelete, setListPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [listDeleteError, setListDeleteError] = useState('');
-  const [showFloatingMenu, setShowFloatingMenu] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['today-tasks']));
   const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
   const [sidebarLabels, setSidebarLabels] = useState<Record<string, string>>(() => {
@@ -238,6 +238,11 @@ function App() {
             : currentView === 'inbox'
               ? '收集箱'
               : '今天';
+  const getFloatingMode = () => {
+    if (currentView === 'calendar') return 'week';
+    if (currentView === 'pomodoro') return 'pomodoro';
+    return 'day';
+  };
 
   useEffect(() => {
     if (currentView === 'calendar' || currentView === 'pomodoro') return;
@@ -309,7 +314,7 @@ function App() {
           onClick={() => setCurrentView('today')}
           className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
-            !['calendar', 'pomodoro', 'search'].includes(currentView)
+            !['calendar', 'pomodoro', 'stats', 'search'].includes(currentView)
               ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
               : 'text-white/50 hover:bg-white/20 hover:text-white/80'
           )}
@@ -345,7 +350,13 @@ function App() {
         </button>
 
         <button
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/50 hover:bg-white/20 hover:text-white/80 transition-all hover-lift"
+          onClick={() => setCurrentView('stats')}
+          className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            currentView === 'stats'
+              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
+              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
+          )}
           title="统计"
         >
           <Grid className="w-5 h-5" />
@@ -376,7 +387,7 @@ function App() {
       </div>
 
       {/* 左侧边栏 */}
-      {currentView !== 'calendar' && currentView !== 'pomodoro' && (
+      {currentView !== 'calendar' && currentView !== 'pomodoro' && currentView !== 'stats' && (
         <div className="w-80 glass-effect shadow-xl border-r border-white/20 dark:border-gray-700/50 flex flex-col">
           <>
           {/* 顶部 */}
@@ -728,6 +739,25 @@ function App() {
               <PomodoroTimer />
             </div>
           </div>
+        ) : currentView === 'stats' ? (
+          <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
+            <div className="mx-auto max-w-3xl">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                  专注统计
+                </h2>
+                <button
+                  onClick={() => setCurrentView('today')}
+                  className="px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 transition-all"
+                >
+                  返回任务
+                </button>
+              </div>
+              <div className="glass-effect rounded-3xl border border-white/30 p-8 shadow-2xl dark:border-gray-700/50">
+                <FocusStats />
+              </div>
+            </div>
+          </div>
         ) : (
           /* 任务视图 */
           <div className="flex flex-1 overflow-hidden">
@@ -785,37 +815,14 @@ function App() {
                       删除清单
                     </button>
                   )}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowFloatingMenu((value) => !value)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/50"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                      浮窗
-                    </button>
-                    {showFloatingMenu && (
-                      <div className="absolute right-0 top-11 z-30 w-44 overflow-hidden rounded-2xl border border-white/50 bg-white/95 p-1 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/95">
-                        {[
-                          ['day', '今日浮窗'],
-                          ['week', '周视图浮窗'],
-                          ['pomodoro', '番茄钟浮窗'],
-                        ].map(([mode, label]) => (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={async () => {
-                              setShowFloatingMenu(false);
-                              await window.electron.floating.open(mode as 'day' | 'week' | 'pomodoro');
-                            }}
-                            className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.electron.floating.open(getFloatingMode())}
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/50"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    浮窗
+                  </button>
                 </div>
               </div>
 

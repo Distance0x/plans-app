@@ -1,5 +1,5 @@
 import { getDatabase } from '../database/db';
-import { taskTags, tasks } from '../database/schema';
+import { reminders, taskTags, tasks } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -24,24 +24,23 @@ export class RecurrenceEngine {
         break;
 
       case 'weekly':
-        next = new Date(current);
-        next.setDate(current.getDate() + rule.interval * 7);
-
-        // 如果指定了星期几，调整到下一个匹配的星期
         if (rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-          const currentDay = next.getDay();
           const sortedDays = [...rule.daysOfWeek].sort((a, b) => a - b);
+          const currentDay = current.getDay();
+          const nextDayThisWeek = sortedDays.find(day => day > currentDay);
 
-          // 找到下一个匹配的星期几
-          let targetDay = sortedDays.find(day => day > currentDay);
-          if (!targetDay) {
-            // 如果没有找到，使用下周的第一个匹配日
-            targetDay = sortedDays[0];
-            next.setDate(next.getDate() + 7);
+          next = new Date(current);
+          if (nextDayThisWeek !== undefined) {
+            next.setDate(current.getDate() + (nextDayThisWeek - currentDay));
+          } else {
+            const startOfWeek = new Date(current);
+            startOfWeek.setDate(current.getDate() - currentDay);
+            next = new Date(startOfWeek);
+            next.setDate(startOfWeek.getDate() + rule.interval * 7 + sortedDays[0]);
           }
-
-          const daysToAdd = targetDay - currentDay;
-          next.setDate(next.getDate() + daysToAdd);
+        } else {
+          next = new Date(current);
+          next.setDate(current.getDate() + rule.interval * 7);
         }
         break;
 
@@ -120,6 +119,7 @@ export class RecurrenceEngine {
         status: 'todo',
         dueDate: nextDate,
         dueTime: task.dueTime,
+        duration: task.duration,
         createdAt: now,
         updatedAt: now,
         completedAt: null,
@@ -128,6 +128,8 @@ export class RecurrenceEngine {
         orderIndex: task.orderIndex,
         estimatedPomodoros: task.estimatedPomodoros,
         actualPomodoros: 0,
+        notes: task.notes,
+        attachments: task.attachments,
         recurrenceRule: task.recurrenceRule,
         recurrenceParentId: task.recurrenceParentId || taskId,
         recurrenceCount: (task.recurrenceCount || 0) + 1,
@@ -143,11 +145,55 @@ export class RecurrenceEngine {
         );
       }
 
+      await this.copyRelativeReminders(taskId, newTaskId, task.dueDate, nextDate, task.dueTime);
+
       console.log('[RecurrenceEngine] Generated next instance:', newTaskId, 'for', taskId);
       return newTaskId;
     } catch (error) {
       console.error('[RecurrenceEngine] Error generating next instance:', error);
       return null;
+    }
+  }
+
+  private static async copyRelativeReminders(
+    sourceTaskId: string,
+    nextTaskId: string,
+    sourceDate: string | null,
+    nextDate: string,
+    dueTime: string | null
+  ) {
+    if (!sourceDate || !dueTime) return;
+
+    const db = await getDatabase();
+    const sourceDueAt = new Date(`${sourceDate}T${dueTime}`);
+    const nextDueAt = new Date(`${nextDate}T${dueTime}`);
+    if (Number.isNaN(sourceDueAt.getTime()) || Number.isNaN(nextDueAt.getTime())) return;
+
+    const sourceReminders = await db
+      .select()
+      .from(reminders)
+      .where(eq(reminders.taskId, sourceTaskId));
+
+    const now = new Date().toISOString();
+    const nextReminderRows = sourceReminders
+      .filter((reminder) => reminder.type === 'due' || reminder.type === 'before_due')
+      .map((reminder) => {
+        const offsetMs = sourceDueAt.getTime() - new Date(reminder.triggerAt).getTime();
+        return {
+          id: randomUUID(),
+          taskId: nextTaskId,
+          triggerAt: new Date(nextDueAt.getTime() - offsetMs).toISOString(),
+          type: reminder.type,
+          channel: reminder.channel,
+          state: 'pending' as const,
+          createdAt: now,
+          updatedAt: now,
+        };
+      })
+      .filter((reminder) => new Date(reminder.triggerAt).getTime() > Date.now());
+
+    if (nextReminderRows.length > 0) {
+      await db.insert(reminders).values(nextReminderRows);
     }
   }
 

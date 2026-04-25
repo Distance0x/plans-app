@@ -189,6 +189,18 @@ export function registerTaskHandlers() {
     if (existing.status !== 'completed' && updates.status === 'completed') {
       await RecurrenceEngine.generateNextInstance(id);
       await completeChildTasks(db, id);
+      await db
+        .update(reminders)
+        .set({
+          state: 'cancelled',
+          updatedAt: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(reminders.taskId, id),
+            eq(reminders.state, 'pending')
+          )
+        );
     }
 
     const [enriched] = await enrichTasksWithTags(db, [updated]);
