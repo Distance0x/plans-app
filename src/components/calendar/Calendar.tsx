@@ -382,7 +382,7 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
     const handleMove = (event: MouseEvent) => {
       const deltaY = event.clientY - startY;
       const deltaMinutes = deltaY / minuteHeight;
-      const nextStartMinute = snapToGrid(startMinute + deltaMinutes, startHour, endHour);
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes);
       setDragPreview({ taskId: task.id, startMinute: nextStartMinute });
     };
 
@@ -392,7 +392,7 @@ function WeekView({ currentDate, tasks, updateTask }: any) {
 
       const deltaY = event.clientY - startY;
       const deltaMinutes = deltaY / minuteHeight;
-      const nextStartMinute = snapToGrid(startMinute + deltaMinutes, startHour, endHour);
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes);
       setDragPreview(null);
       await updateTask(task.id, { dueTime: formatClock(nextStartMinute) });
     };
