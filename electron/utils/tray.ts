@@ -2,7 +2,12 @@ import { Event, app, BrowserWindow, Menu, Tray, nativeImage } from 'electron';
 
 let tray: Tray | null = null;
 
-export function createAppTray(mainWindow: BrowserWindow) {
+type FloatingMode = 'day' | 'week' | 'pomodoro';
+
+export function createAppTray(
+  mainWindow: BrowserWindow,
+  openFloating?: (mode: FloatingMode) => BrowserWindow
+) {
   const icon = nativeImage.createFromDataURL(
     'data:image/svg+xml;utf8,' +
       encodeURIComponent(`
@@ -35,6 +40,19 @@ export function createAppTray(mainWindow: BrowserWindow) {
         showWindow();
         mainWindow.webContents.send('tray-start-pomodoro');
       },
+    },
+    { type: 'separator' },
+    {
+      label: '今日浮窗',
+      click: () => openFloating?.('day'),
+    },
+    {
+      label: '周视图浮窗',
+      click: () => openFloating?.('week'),
+    },
+    {
+      label: '番茄钟浮窗',
+      click: () => openFloating?.('pomodoro'),
     },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() },

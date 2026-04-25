@@ -1,0 +1,9 @@
+import { BrowserWindow } from 'electron';
+
+export function broadcastToWindows(channel: string, payload?: unknown) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(channel, payload);
+    }
+  }
+}
