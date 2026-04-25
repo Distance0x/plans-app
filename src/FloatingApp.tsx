@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle, Circle, Clock, Eye, EyeOff, Maximize2, X } from 'lucide-react';
 import { useTaskStore, type Task } from './stores/task-store';
 import { useTimerStore } from './stores/timer-store';
@@ -153,16 +153,25 @@ function TaskSection({
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => (
-            <button
+            <div
               key={task.id}
-              onClick={() => onToggle(task.id)}
               className="flex w-full items-start gap-2 rounded-xl bg-slate-50/80 px-3 py-2 text-left transition-colors hover:bg-blue-50 dark:bg-slate-800/70 dark:hover:bg-slate-800"
             >
-              {task.status === 'completed' ? (
-                <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
-              ) : (
-                <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-              )}
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void onToggle(task.id);
+                }}
+                className="mt-0.5 flex-shrink-0 transition-transform hover:scale-110"
+                title="完成任务"
+              >
+                {task.status === 'completed' ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Circle className="h-4 w-4 text-slate-400 hover:text-blue-500" />
+                )}
+              </button>
               <span className="min-w-0 flex-1">
                 <span className={cn('block truncate text-sm font-medium', compact && 'text-xs')}>
                   {task.title}
@@ -174,7 +183,7 @@ function TaskSection({
                   </span>
                 )}
               </span>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -189,6 +198,9 @@ function FloatingWeekTimeline({
   tasks: Task[];
   updateTask: (id: string, updates: Partial<Task>) => Promise<Task | null>;
 }) {
+  const [dragPreview, setDragPreview] = useState<{ taskId: string; startMinute: number } | null>(null);
+  const [resizePreview, setResizePreview] = useState<{ taskId: string; duration: number } | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const today = new Date();
   const startOfWeek = new Date(today);
   startOfWeek.setDate(today.getDate() - today.getDay());
@@ -225,7 +237,21 @@ function FloatingWeekTimeline({
 
   const hours = Array.from({ length: endHour - startHour }, (_, index) => startHour + index);
   const hourHeight = 52;
+  const minuteHeight = hourHeight / 60;
+  const snapMinutes = 15;
   const weekDayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const todayIndex = weekDays.findIndex((date) => isToday(date));
+    if (todayIndex < 0) return;
+
+    const timelineWidth = container.scrollWidth - 48;
+    const dayWidth = timelineWidth / 7;
+    container.scrollLeft = Math.max(0, todayIndex * dayWidth - dayWidth * 0.25);
+  }, []);
 
   const getTasksForDay = (date: Date) => {
     const dateKey = formatDateKey(date);
@@ -233,9 +259,10 @@ function FloatingWeekTimeline({
   };
 
   const getTaskPosition = (task: Task) => {
-    const [hour, minute] = (task.dueTime || `${startHour}:00`).split(':').map(Number);
-    const startMinute = hour * 60 + minute;
-    const duration = Math.max(Number(task.duration) || 60, 15);
+    const startMinute = dragPreview?.taskId === task.id
+      ? dragPreview.startMinute
+      : getTaskStartMinute(task);
+    const duration = getTaskDuration(task);
     const top = ((startMinute - startHour * 60) / 60) * hourHeight;
     const height = Math.max((duration / 60) * hourHeight, 28);
 
@@ -245,6 +272,79 @@ function FloatingWeekTimeline({
       startMinute,
       endMinute: startMinute + duration,
     };
+  };
+
+  const getTaskStartMinute = (task: Task) => {
+    const [hour, minute] = (task.dueTime || `${startHour}:00`).split(':').map(Number);
+    return hour * 60 + minute;
+  };
+
+  const getTaskDuration = (task: Task) => {
+    if (resizePreview?.taskId === task.id) {
+      return resizePreview.duration;
+    }
+
+    return Math.max(Number(task.duration) || 60, snapMinutes);
+  };
+
+  const snapToGrid = (minutes: number) => {
+    const snapped = Math.round(minutes / snapMinutes) * snapMinutes;
+    return Math.max(startHour * 60, Math.min(endHour * 60 - snapMinutes, snapped));
+  };
+
+  const startDrag = (event: React.MouseEvent<HTMLDivElement>, task: Task) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startY = event.clientY;
+    const startMinute = getTaskStartMinute(task);
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const deltaMinutes = (moveEvent.clientY - startY) / minuteHeight;
+      setDragPreview({ taskId: task.id, startMinute: snapToGrid(startMinute + deltaMinutes) });
+    };
+
+    const handleUp = async (upEvent: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      const deltaMinutes = (upEvent.clientY - startY) / minuteHeight;
+      const nextStartMinute = snapToGrid(startMinute + deltaMinutes);
+      setDragPreview(null);
+      await updateTask(task.id, { dueTime: formatClock(nextStartMinute) });
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  };
+
+  const snapDuration = (minutes: number) => {
+    const snapped = Math.round(minutes / snapMinutes) * snapMinutes;
+    return Math.max(snapMinutes, Math.min(12 * 60, snapped));
+  };
+
+  const startResize = (event: React.MouseEvent<HTMLDivElement>, task: Task) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startY = event.clientY;
+    const startDuration = getTaskDuration(task);
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const deltaMinutes = (moveEvent.clientY - startY) / minuteHeight;
+      setResizePreview({ taskId: task.id, duration: snapDuration(startDuration + deltaMinutes) });
+    };
+
+    const handleUp = async (upEvent: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      const deltaMinutes = (upEvent.clientY - startY) / minuteHeight;
+      const nextDuration = snapDuration(startDuration + deltaMinutes);
+      setResizePreview(null);
+      await updateTask(task.id, { duration: nextDuration });
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
   };
 
   const formatClock = (totalMinutes: number) => {
@@ -265,7 +365,7 @@ function FloatingWeekTimeline({
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-150px)] overflow-auto">
+      <div ref={scrollRef} className="max-h-[calc(100vh-150px)] overflow-auto">
         <div className="flex min-w-[720px]">
           <div className="sticky left-0 z-20 w-12 flex-shrink-0 bg-white/95 dark:bg-slate-900/95">
             <div className="h-12 border-b border-slate-100 dark:border-slate-800" />
@@ -309,12 +409,10 @@ function FloatingWeekTimeline({
                     {dayTasks.map((task, taskIndex) => {
                       const position = getTaskPosition(task);
                       return (
-                        <button
+                        <div
                           key={task.id}
-                          type="button"
-                          onClick={() => updateTask(task.id, { status: 'completed' })}
                           className={cn(
-                            'absolute left-1 right-1 overflow-hidden rounded-lg border-l-2 px-1.5 py-1 text-left text-[10px] shadow-sm transition-transform hover:scale-[1.02]',
+                            'group absolute left-1 right-1 cursor-move overflow-hidden rounded-lg border-l-2 px-1.5 py-1 text-left text-[10px] shadow-sm transition-transform hover:scale-[1.02]',
                             task.priority === 'high'
                               ? 'border-red-500 bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-100'
                               : task.priority === 'medium'
@@ -328,12 +426,20 @@ function FloatingWeekTimeline({
                             height: position.height,
                           }}
                           title={`${task.title} ${formatClock(position.startMinute)} - ${formatClock(position.endMinute)}`}
+                          onMouseDown={(event) => startDrag(event, task)}
                         >
                           <div className="truncate font-semibold">{task.title}</div>
                           <div className="truncate opacity-75">
                             {formatClock(position.startMinute)} - {formatClock(position.endMinute)}
                           </div>
-                        </button>
+                          <div
+                            className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize opacity-0 group-hover:opacity-100"
+                            onMouseDown={(event) => startResize(event, task)}
+                            title="拖动修改结束时间"
+                          >
+                            <div className="mx-auto mt-0.5 h-0.5 w-8 rounded-full bg-current opacity-60" />
+                          </div>
+                        </div>
                       );
                     })}
                   </div>

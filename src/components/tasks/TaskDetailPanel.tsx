@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Calendar, CheckSquare, ExternalLink, Flag, FileText, Paperclip } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Calendar, CheckSquare, Flag, ListChecks, StickyNote } from 'lucide-react';
 import { type Task, useTaskStore } from '@/stores/task-store';
 import { cn } from '@/lib/utils';
 
@@ -8,15 +8,12 @@ interface TaskDetailPanelProps {
 }
 
 export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
-  const { lists, tags, createTag, updateTask, toggleComplete, setTaskTags } = useTaskStore();
+  const { lists, updateTask, toggleComplete } = useTaskStore();
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
-  const [newTagName, setNewTagName] = useState('');
 
   useEffect(() => {
     setTitle(task?.title || '');
-    setDescription(task?.description || '');
     setNotes(task?.notes || '');
   }, [task?.id]);
 
@@ -29,12 +26,9 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
     if (!task) return;
     await updateTask(task.id, {
       title: title.trim() || task.title,
-      description: description.trim(),
       notes: notes.trim(),
     });
   };
-
-  const attachments = parseAttachments(task?.attachments);
 
   if (!task) {
     return (
@@ -47,16 +41,17 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
   }
 
   return (
-    <aside className="w-[380px] flex-shrink-0 border-l border-gray-200 bg-white/90 dark:border-gray-700 dark:bg-gray-900/90">
+    <aside className="w-[420px] flex-shrink-0 border-l border-slate-200 bg-gradient-to-b from-slate-50 via-white to-blue-50/50 dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950/20">
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+        <div className="border-b border-slate-200/80 bg-white/80 px-6 py-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="flex items-center gap-3">
           <button
             onClick={() => toggleComplete(task.id)}
             className={cn(
-              'flex h-6 w-6 items-center justify-center rounded border transition-colors',
+              'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
               task.status === 'completed'
-                ? 'border-green-500 bg-green-500 text-white'
-                : 'border-gray-300 text-gray-400 hover:border-blue-500'
+                ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                : 'border-slate-300 bg-white text-slate-400 hover:border-blue-500 hover:text-blue-500 dark:border-slate-700 dark:bg-slate-900'
             )}
             title="完成"
           >
@@ -69,13 +64,26 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
             onKeyDown={(event) => {
               if (event.key === 'Enter') event.currentTarget.blur();
             }}
-            className="min-w-0 flex-1 bg-transparent text-xl font-semibold text-gray-900 outline-none dark:text-white"
+            className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-slate-900 outline-none dark:text-white"
           />
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span className={cn('rounded-full px-2.5 py-1 font-medium', getStatusColor(task.status))}>
+              {statusLabel}
+            </span>
+            <span>创建于 {new Date(task.createdAt).toLocaleString()}</span>
+          </div>
         </div>
 
         <div className="space-y-5 overflow-y-auto px-6 py-5">
-          <div className="grid grid-cols-[88px_1fr] items-center gap-3 text-sm">
-            <div className="flex items-center gap-2 text-gray-400">
+          <section className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <ListChecks className="h-4 w-4 text-blue-500" />
+              任务属性
+            </div>
+
+            <div className="grid grid-cols-[72px_1fr] items-center gap-3 text-sm">
+            <div className="flex items-center gap-2 text-slate-400">
               <Flag className="h-4 w-4" />
               状态
             </div>
@@ -87,8 +95,8 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
                   className={cn(
                     'rounded-md border px-2.5 py-1 text-xs transition-colors',
                     task.status === status
-                      ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/50'
-                      : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
+                      ? getStatusColor(status)
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800'
                   )}
                 >
                   {status === 'todo' ? '待处理' : status === 'in_progress' ? '处理中' : '已完成'}
@@ -96,21 +104,24 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
               ))}
             </div>
 
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-slate-400">
               <Flag className="h-4 w-4" />
               优先级
             </div>
             <select
               value={task.priority}
               onChange={(event) => updateTask(task.id, { priority: event.target.value as Task['priority'] })}
-              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              className={cn(
+                'rounded-lg border px-2.5 py-2 text-sm font-medium outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800',
+                getPriorityColor(task.priority)
+              )}
             >
               <option value="high">高</option>
               <option value="medium">中</option>
               <option value="low">低</option>
             </select>
 
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-slate-400">
               <Calendar className="h-4 w-4" />
               日期
             </div>
@@ -119,24 +130,24 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
                 type="date"
                 value={task.dueDate || ''}
                 onChange={(event) => updateTask(task.id, { dueDate: event.target.value })}
-                className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               />
               <input
                 type="time"
                 value={task.dueTime || ''}
                 onChange={(event) => updateTask(task.id, { dueTime: event.target.value })}
-                className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               />
             </div>
 
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-slate-400">
               <Flag className="h-4 w-4" />
               清单
             </div>
             <select
               value={task.listId || 'inbox'}
               onChange={(event) => updateTask(task.id, { listId: event.target.value })}
-              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               {lists.map((list) => (
                 <option key={list.id} value={list.id}>
@@ -145,163 +156,23 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
               ))}
             </select>
           </div>
+          </section>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">标签</label>
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => {
-                const selected = task.tags?.some((item) => item.id === tag.id) ?? false;
-                const nextTagIds = selected
-                  ? (task.tags || []).filter((item) => item.id !== tag.id).map((item) => item.id)
-                  : [...(task.tags || []).map((item) => item.id), tag.id];
-
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => setTaskTags(task.id, nextTagIds)}
-                    className={cn(
-                      'rounded-full border px-3 py-1 text-xs transition-colors',
-                      selected
-                        ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/50'
-                        : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700'
-                    )}
-                  >
-                    #{tag.name}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={newTagName}
-                onChange={(event) => setNewTagName(event.target.value)}
-                placeholder="新建标签"
-                className="min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  const tag = await createTag({ name: newTagName });
-                  if (!tag) return;
-                  setNewTagName('');
-                  await setTaskTags(task.id, Array.from(new Set([...(task.tags || []).map((item) => item.id), tag.id])));
-                }}
-                className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                添加
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-gray-400">
-              <FileText className="h-4 w-4" />
-              描述
+          <section className="rounded-2xl border border-blue-100 bg-white/90 p-4 shadow-sm dark:border-blue-900/40 dark:bg-slate-900/85">
+            <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <StickyNote className="h-4 w-4 text-blue-500" />
+              笔记
             </label>
-            <input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              onBlur={saveTextFields}
-              placeholder="添加简短描述"
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              <Paperclip className="h-4 w-4 text-gray-400" />
-              附件
-            </label>
-            {attachments.length > 0 ? (
-              <div className="space-y-2">
-                {attachments.map((attachment) => (
-                  <div
-                    key={getAttachmentKey(attachment)}
-                    className="flex items-center gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-gray-700 dark:text-gray-200">
-                        {getAttachmentName(attachment)}
-                      </div>
-                      {formatAttachmentSize(attachment) && (
-                        <div className="text-xs text-gray-400">{formatAttachmentSize(attachment)}</div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const targetPath = getAttachmentPath(attachment);
-                        if (!targetPath) return;
-                        await window.electron.file.openAttachment(targetPath);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/40"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      打开
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-sm text-gray-400 dark:border-gray-700">
-                暂无附件
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">笔记</label>
-            <div className="relative">
               <MarkdownEditor
                 value={notes}
                 onChange={setNotes}
                 onBlur={saveTextFields}
               />
-            </div>
-          </div>
-
-          <div className="text-xs text-gray-400">
-            {statusLabel} · 创建于 {new Date(task.createdAt).toLocaleString()}
-          </div>
+          </section>
         </div>
       </div>
     </aside>
   );
-}
-
-function parseAttachments(value?: string | null) {
-  if (!value) return [];
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function getAttachmentName(value: any) {
-  if (typeof value === 'string') {
-    return value.split(/[\\/]/).pop() || value;
-  }
-
-  return value?.originalName || value?.storedPath?.split(/[\\/]/).pop() || '附件';
-}
-
-function getAttachmentPath(value: any) {
-  return typeof value === 'string' ? value : value?.storedPath;
-}
-
-function getAttachmentKey(value: any) {
-  return typeof value === 'string' ? value : value?.storedPath || value?.sourcePath || value?.originalName;
-}
-
-function formatAttachmentSize(value: any) {
-  const size = Number(value?.size);
-  if (!Number.isFinite(size) || size <= 0) return '';
-  if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 interface MarkdownEditorProps {
@@ -311,51 +182,127 @@ interface MarkdownEditorProps {
 }
 
 function MarkdownEditor({ value, onChange, onBlur }: MarkdownEditorProps) {
-  const [isFocused, setIsFocused] = useState(false);
+  const [activeLineIndex, setActiveLineIndex] = useState<number | null>(value ? null : 0);
+  const lineRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+  const lines = value.length > 0 ? value.split('\n') : [''];
 
-  if (!isFocused && value.trim()) {
-    return (
-      <div
-        onClick={() => setIsFocused(true)}
-        className="min-h-[280px] cursor-text rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
-      >
-        <MarkdownPreview markdown={value} />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (activeLineIndex === null) return;
+    lineRefs.current[activeLineIndex]?.focus();
+  }, [activeLineIndex, lines.length]);
+
+  const updateLine = (index: number, nextValue: string) => {
+    const nextLines = [...lines];
+    if (nextValue.includes('\n')) {
+      const pastedLines = nextValue.split('\n');
+      nextLines.splice(index, 1, ...pastedLines);
+      onChange(nextLines.join('\n'));
+      setActiveLineIndex(index + pastedLines.length - 1);
+      return;
+    }
+
+    nextLines[index] = nextValue;
+    onChange(nextLines.join('\n'));
+  };
+
+  const insertLineAfter = (index: number) => {
+    const nextLines = [...lines];
+    nextLines.splice(index + 1, 0, '');
+    onChange(nextLines.join('\n'));
+    setActiveLineIndex(index + 1);
+  };
+
+  const removeLine = (index: number) => {
+    if (lines.length === 1) {
+      onChange('');
+      return;
+    }
+
+    const nextLines = [...lines];
+    nextLines.splice(index, 1);
+    onChange(nextLines.join('\n'));
+    setActiveLineIndex(Math.max(0, index - 1));
+  };
 
   return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={() => {
-        setIsFocused(false);
-        onBlur();
+    <div
+      className="min-h-[360px] rounded-xl border border-blue-100 bg-gradient-to-b from-white to-blue-50/40 p-4 text-sm leading-relaxed dark:border-blue-900/40 dark:from-slate-900 dark:to-blue-950/20"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setActiveLineIndex(null);
+          onBlur();
+        }
       }}
-      onFocus={() => setIsFocused(true)}
-      autoFocus={isFocused}
-      placeholder="# 标题&#10;&#10;## 子标题&#10;&#10;- 列表项&#10;- [ ] 待办事项&#10;- [x] 已完成&#10;&#10;**粗体** *斜体* `代码`&#10;&#10;> 引用文本"
-      className="min-h-[280px] w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-    />
+      onClick={() => {
+        if (value.trim()) return;
+        setActiveLineIndex(0);
+      }}
+    >
+      {lines.map((line, index) => {
+        const isActive = activeLineIndex === index;
+
+        if (isActive) {
+          return (
+            <textarea
+              key={`edit-${index}`}
+              ref={(element) => {
+                lineRefs.current[index] = element;
+              }}
+              value={line}
+              onChange={(event) => updateLine(index, event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  insertLineAfter(index);
+                }
+                if (event.key === 'Backspace' && !line) {
+                  event.preventDefault();
+                  removeLine(index);
+                }
+              }}
+              placeholder={index === 0 ? '# 标题' : ''}
+              rows={1}
+              className="block min-h-8 w-full resize-none rounded-lg border border-blue-200 bg-white/90 px-3 py-1.5 font-mono text-sm leading-6 text-slate-800 outline-none ring-2 ring-blue-500/15 dark:border-blue-900/60 dark:bg-slate-950/80 dark:text-slate-100"
+            />
+          );
+        }
+
+        return (
+          <div
+            key={`preview-${index}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setActiveLineIndex(index);
+            }}
+            className="min-h-8 cursor-text rounded-lg px-3 py-1.5 hover:bg-blue-50/70 dark:hover:bg-blue-950/30"
+          >
+            {line.trim() ? renderMarkdownLine(line, index) : <div className="h-6" />}
+          </div>
+        );
+      })}
+
+      {!value.trim() && activeLineIndex === null && (
+        <div
+          onClick={() => setActiveLineIndex(0)}
+          className="cursor-text rounded-lg px-3 py-2 text-slate-400"
+        >
+          点击编辑笔记...
+        </div>
+      )}
+      </div>
   );
 }
 
-function MarkdownPreview({ markdown }: { markdown: string }) {
-  const lines = markdown.split('\n');
+function getStatusColor(status: Task['status']) {
+  if (status === 'completed') return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300';
+  if (status === 'in_progress') return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300';
+  return 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300';
+}
 
-  if (!markdown.trim()) {
-    return (
-      <div className="text-sm text-gray-400">
-        点击编辑笔记...
-      </div>
-    );
-  }
-
-  return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
-      {lines.map((line, index) => renderMarkdownLine(line, index))}
-    </div>
-  );
+function getPriorityColor(priority: Task['priority']) {
+  if (priority === 'high') return 'border-red-200 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300';
+  if (priority === 'medium') return 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300';
+  return 'border-sky-200 bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300';
 }
 
 function renderMarkdownLine(line: string, index: number) {

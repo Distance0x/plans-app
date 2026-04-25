@@ -137,7 +137,6 @@ function initDatabase(sqlDb: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
-    CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id);
     CREATE INDEX IF NOT EXISTS idx_reminders_task_id ON reminders(task_id);
     CREATE INDEX IF NOT EXISTS idx_reminders_state_trigger ON reminders(state, trigger_at);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_task_id ON pomodoro_sessions(task_id);
@@ -152,6 +151,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
   ensureColumn(sqlDb, 'tasks', 'recurrence_rule', 'TEXT');
   ensureColumn(sqlDb, 'tasks', 'recurrence_parent_id', 'TEXT');
   ensureColumn(sqlDb, 'tasks', 'recurrence_count', 'INTEGER DEFAULT 0');
+  sqlDb.run('CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id)');
 
   // 插入默认设置
   const now = new Date().toISOString();
