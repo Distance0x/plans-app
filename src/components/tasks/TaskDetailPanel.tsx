@@ -8,10 +8,11 @@ interface TaskDetailPanelProps {
 }
 
 export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
-  const { updateTask, toggleComplete } = useTaskStore();
+  const { lists, tags, createTag, updateTask, toggleComplete, setTaskTags } = useTaskStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
+  const [newTagName, setNewTagName] = useState('');
 
   useEffect(() => {
     setTitle(task?.title || '');
@@ -124,6 +125,70 @@ export function TaskDetailPanel({ task }: TaskDetailPanelProps) {
                 onChange={(event) => updateTask(task.id, { dueTime: event.target.value })}
                 className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               />
+            </div>
+
+            <div className="flex items-center gap-2 text-gray-400">
+              <Flag className="h-4 w-4" />
+              清单
+            </div>
+            <select
+              value={task.listId || 'inbox'}
+              onChange={(event) => updateTask(task.id, { listId: event.target.value })}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            >
+              {lists.map((list) => (
+                <option key={list.id} value={list.id}>
+                  {list.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">标签</label>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => {
+                const selected = task.tags?.some((item) => item.id === tag.id) ?? false;
+                const nextTagIds = selected
+                  ? (task.tags || []).filter((item) => item.id !== tag.id).map((item) => item.id)
+                  : [...(task.tags || []).map((item) => item.id), tag.id];
+
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => setTaskTags(task.id, nextTagIds)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs transition-colors',
+                      selected
+                        ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/50'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700'
+                    )}
+                  >
+                    #{tag.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newTagName}
+                onChange={(event) => setNewTagName(event.target.value)}
+                placeholder="新建标签"
+                className="min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const tag = await createTag({ name: newTagName });
+                  if (!tag) return;
+                  setNewTagName('');
+                  await setTaskTags(task.id, Array.from(new Set([...(task.tags || []).map((item) => item.id), tag.id])));
+                }}
+                className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                添加
+              </button>
             </div>
           </div>
 

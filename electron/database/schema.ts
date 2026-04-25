@@ -13,6 +13,7 @@ export const tasks = sqliteTable('tasks', {
   updatedAt: text('updated_at').notNull(),
   completedAt: text('completed_at'),
   parentId: text('parent_id'),
+  listId: text('list_id').default('inbox'),
   orderIndex: integer('order_index').default(0),
   estimatedPomodoros: integer('estimated_pomodoros').default(0),
   actualPomodoros: integer('actual_pomodoros').default(0),
@@ -22,6 +23,16 @@ export const tasks = sqliteTable('tasks', {
   recurrenceRule: text('recurrence_rule'), // JSON string
   recurrenceParentId: text('recurrence_parent_id'), // 原始重复任务 ID
   recurrenceCount: integer('recurrence_count').default(0), // 已生成次数
+});
+
+export const lists = sqliteTable('lists', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  color: text('color').default('#3B82F6'),
+  orderIndex: integer('order_index').default(0),
+  archivedAt: text('archived_at'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
 });
 
 export const pomodoroSessions = sqliteTable('pomodoro_sessions', {

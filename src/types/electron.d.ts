@@ -6,6 +6,19 @@ export interface ElectronAPI {
     list: (filters?: any) => Promise<any[]>;
     search: (query: string) => Promise<any[]>;
   };
+  list: {
+    list: () => Promise<any[]>;
+    create: (data: any) => Promise<any>;
+    update: (id: string, updates: any) => Promise<any>;
+    delete: (id: string) => Promise<void>;
+  };
+  tag: {
+    list: () => Promise<any[]>;
+    create: (data: any) => Promise<any>;
+    update: (id: string, updates: any) => Promise<any>;
+    delete: (id: string) => Promise<void>;
+    setTaskTags: (taskId: string, tagIds: string[]) => Promise<string[]>;
+  };
   timer: {
     start: (taskId?: string) => Promise<any>;
     pause: () => Promise<any>;
@@ -33,6 +46,17 @@ export interface ElectronAPI {
   backup: {
     export: () => Promise<{ cancelled: boolean; filePath?: string }>;
     import: () => Promise<{ cancelled: boolean; filePath?: string }>;
+  };
+  window: {
+    minimize: () => void;
+    maximize: () => void;
+    close: () => void;
+  };
+  floating: {
+    open: (mode: 'day' | 'week' | 'pomodoro') => Promise<void>;
+    close: () => Promise<void>;
+    showMain: () => Promise<void>;
+    setAlwaysOnTop: (enabled: boolean) => Promise<void>;
   };
   file: {
     selectAttachments: () => Promise<string[]>;

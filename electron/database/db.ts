@@ -63,6 +63,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       updated_at TEXT NOT NULL,
       completed_at TEXT,
       parent_id TEXT,
+      list_id TEXT DEFAULT 'inbox',
       order_index INTEGER DEFAULT 0,
       estimated_pomodoros INTEGER DEFAULT 0,
       actual_pomodoros INTEGER DEFAULT 0,
@@ -102,6 +103,16 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS lists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT DEFAULT '#3B82F6',
+      order_index INTEGER DEFAULT 0,
+      archived_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS tags (
       id TEXT PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
@@ -118,6 +129,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id);
     CREATE INDEX IF NOT EXISTS idx_reminders_task_id ON reminders(task_id);
     CREATE INDEX IF NOT EXISTS idx_reminders_state_trigger ON reminders(state, trigger_at);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_task_id ON pomodoro_sessions(task_id);
@@ -125,6 +137,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
   `);
 
   ensureColumn(sqlDb, 'tasks', 'duration', 'INTEGER DEFAULT 60');
+  ensureColumn(sqlDb, 'tasks', 'list_id', "TEXT DEFAULT 'inbox'");
   ensureColumn(sqlDb, 'tasks', 'notes', 'TEXT');
   ensureColumn(sqlDb, 'tasks', 'attachments', 'TEXT');
   ensureColumn(sqlDb, 'tasks', 'recurrence_rule', 'TEXT');
@@ -133,6 +146,13 @@ function initDatabase(sqlDb: SqlJsDatabase) {
 
   // 插入默认设置
   const now = new Date().toISOString();
+  sqlDb.run(
+    `INSERT OR IGNORE INTO lists (id, name, color, order_index, archived_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ['inbox', '收集箱', '#64748B', 0, null, now, now]
+  );
+  sqlDb.run('UPDATE tasks SET list_id = ? WHERE list_id IS NULL OR list_id = ?', ['inbox', '']);
+
   const defaultSettings = [
     ['theme', '"light"'],
     ['workDuration', '1500'],

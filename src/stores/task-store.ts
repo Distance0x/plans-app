@@ -21,6 +21,7 @@ export interface Task {
   updatedAt: string;
   completedAt?: string;
   parentId?: string | null;
+  listId?: string | null;
   orderIndex: number;
   estimatedPomodoros: number;
   actualPomodoros: number;
@@ -29,16 +30,37 @@ export interface Task {
   recurrenceRule?: string | null;
   recurrenceParentId?: string | null;
   recurrenceCount?: number;
+  tags?: Tag[];
 }
 
 export interface TaskInput extends Omit<Partial<Task>, 'attachments'> {
   attachments?: string[] | string | null;
   reminderAt?: string;
   reminderChannel?: 'notification' | 'sound' | 'both';
+  tagIds?: string[];
+}
+
+export interface TaskList {
+  id: string;
+  name: string;
+  color?: string | null;
+  orderIndex?: number;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color?: string | null;
+  createdAt: string;
 }
 
 interface TaskStore {
   tasks: Task[];
+  lists: TaskList[];
+  tags: Tag[];
   loading: boolean;
   error: string | null;
   focusedTaskId: string | null;
@@ -46,6 +68,12 @@ interface TaskStore {
   // 操作
   setFocusedTask: (id: string | null) => void;
   fetchTasks: (filters?: any) => Promise<void>;
+  fetchLists: () => Promise<void>;
+  createList: (data: Partial<TaskList>) => Promise<TaskList | null>;
+  deleteList: (id: string) => Promise<boolean>;
+  fetchTags: () => Promise<void>;
+  createTag: (data: Partial<Tag>) => Promise<Tag | null>;
+  setTaskTags: (taskId: string, tagIds: string[]) => Promise<void>;
   createTask: (data: TaskInput) => Promise<Task | null>;
   updateTask: (id: string, updates: TaskInput) => Promise<Task | null>;
   deleteTask: (id: string) => Promise<void>;
@@ -55,11 +83,98 @@ interface TaskStore {
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
+  lists: [],
+  tags: [],
   loading: false,
   error: null,
   focusedTaskId: null,
 
   setFocusedTask: (id) => set({ focusedTaskId: id }),
+
+  fetchLists: async () => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      const lists = await window.electron.list.list();
+      set({ lists });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
+  },
+
+  createList: async (data) => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      const list = await window.electron.list.create(data);
+      set((state) => ({ lists: [...state.lists, list] }));
+      return list;
+    } catch (error: any) {
+      set({ error: error.message });
+      return null;
+    }
+  },
+
+  deleteList: async (id) => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      await window.electron.list.delete(id);
+      set((state) => ({
+        lists: state.lists.filter((list) => list.id !== id),
+        tasks: state.tasks.map((task) =>
+          (task.listId || 'inbox') === id ? { ...task, listId: 'inbox' } : task
+        ),
+      }));
+      return true;
+    } catch (error: any) {
+      set({ error: error.message });
+      return false;
+    }
+  },
+
+  fetchTags: async () => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      const tags = await window.electron.tag.list();
+      set({ tags });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
+  },
+
+  createTag: async (data) => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      const tag = await window.electron.tag.create(data);
+      set((state) => ({
+        tags: state.tags.some((item) => item.id === tag.id) ? state.tags : [...state.tags, tag],
+      }));
+      return tag;
+    } catch (error: any) {
+      set({ error: error.message });
+      return null;
+    }
+  },
+
+  setTaskTags: async (taskId, tagIds) => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      await window.electron.tag.setTaskTags(taskId, tagIds);
+      await get().fetchTasks();
+    } catch (error: any) {
+      set({ error: error.message });
+    }
+  },
 
   fetchTasks: async (filters) => {
     set({ loading: true, error: null });
@@ -179,6 +294,20 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
 }));
+
+if (window.electron) {
+  window.electron.on('tasks:changed', () => {
+    void useTaskStore.getState().fetchTasks();
+  });
+
+  window.electron.on('lists:changed', () => {
+    void useTaskStore.getState().fetchLists();
+  });
+
+  window.electron.on('tags:changed', () => {
+    void useTaskStore.getState().fetchTags();
+  });
+}
 
 function getDefaultReminderAt(data: TaskInput) {
   if (!data.dueDate || !data.dueTime) return '';

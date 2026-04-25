@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron';
 import { getDatabase } from '../database/db';
-import { reminders, tasks } from '../database/schema';
+import { reminders, tags, taskTags, tasks } from '../database/schema';
 import { and, eq, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { RecurrenceEngine } from '../services/recurrence-engine';
+import { broadcastToWindows } from '../utils/window-broadcast';
 
 function emptyToNull(value: unknown): string | null {
   if (value === '' || value === undefined || value === null) {
@@ -27,12 +28,36 @@ function normalizeTaskInput(data: any) {
     dueTime: emptyToNull(data.dueTime),
     duration: data.duration ? Number(data.duration) : 60,
     parentId: emptyToNull(data.parentId),
+    listId: emptyToNull(data.listId) || 'inbox',
     orderIndex: data.orderIndex || 0,
     estimatedPomodoros: data.estimatedPomodoros || 0,
     notes: emptyToNull(data.notes),
     attachments: data.attachments ? JSON.stringify(data.attachments) : null,
     recurrenceRule,
   };
+}
+
+async function enrichTasksWithTags(db: Awaited<ReturnType<typeof getDatabase>>, taskRows: any[]) {
+  if (taskRows.length === 0) return taskRows;
+
+  const allTags = await db.select().from(tags);
+  const tagMap = new Map(allTags.map((tag) => [tag.id, tag]));
+  const allTaskTags = await db.select().from(taskTags);
+  const tagsByTask = new Map<string, any[]>();
+
+  for (const relation of allTaskTags) {
+    const tag = tagMap.get(relation.tagId);
+    if (!tag) continue;
+
+    const current = tagsByTask.get(relation.taskId) || [];
+    current.push(tag);
+    tagsByTask.set(relation.taskId, current);
+  }
+
+  return taskRows.map((task) => ({
+    ...task,
+    tags: tagsByTask.get(task.id) || [],
+  }));
 }
 
 async function deleteTaskCascade(db: Awaited<ReturnType<typeof getDatabase>>, id: string) {
@@ -54,6 +79,7 @@ async function deleteTaskCascade(db: Awaited<ReturnType<typeof getDatabase>>, id
     .where(eq(reminders.taskId, id));
 
   await db.delete(tasks).where(eq(tasks.id, id));
+  await db.delete(taskTags).where(eq(taskTags.taskId, id));
 }
 
 async function completeChildTasks(db: Awaited<ReturnType<typeof getDatabase>>, parentId: string) {
@@ -95,7 +121,19 @@ export function registerTaskHandlers() {
     };
 
     await db.insert(tasks).values(task);
-    return task;
+
+    if (Array.isArray(data.tagIds) && data.tagIds.length > 0) {
+      await db.insert(taskTags).values(
+        Array.from(new Set(data.tagIds)).map((tagId) => ({
+          taskId: task.id,
+          tagId: String(tagId),
+        }))
+      );
+    }
+
+    const [enriched] = await enrichTasksWithTags(db, [task]);
+    broadcastToWindows('tasks:changed');
+    return enriched;
   });
 
   // 更新任务
@@ -114,6 +152,10 @@ export function registerTaskHandlers() {
     };
 
     for (const key of Object.keys(updates)) {
+      if (key === 'tagIds' || key === 'tags') {
+        continue;
+      }
+
       if (key in normalized) {
         updateData[key] = (normalized as any)[key];
       } else {
@@ -129,6 +171,19 @@ export function registerTaskHandlers() {
 
     await db.update(tasks).set(updateData).where(eq(tasks.id, id));
 
+    if (Array.isArray(updates.tagIds)) {
+      await db.delete(taskTags).where(eq(taskTags.taskId, id));
+      const uniqueTagIds = Array.from(new Set(updates.tagIds));
+      if (uniqueTagIds.length > 0) {
+        await db.insert(taskTags).values(
+          uniqueTagIds.map((tagId) => ({
+            taskId: id,
+            tagId: String(tagId),
+          }))
+        );
+      }
+    }
+
     const [updated] = await db.select().from(tasks).where(eq(tasks.id, id));
 
     if (existing.status !== 'completed' && updates.status === 'completed') {
@@ -136,13 +191,16 @@ export function registerTaskHandlers() {
       await completeChildTasks(db, id);
     }
 
-    return updated;
+    const [enriched] = await enrichTasksWithTags(db, [updated]);
+    broadcastToWindows('tasks:changed');
+    return enriched;
   });
 
   // 删除任务
   ipcMain.handle('task:delete', async (_, id) => {
     const db = await getDatabase();
     await deleteTaskCascade(db, id);
+    broadcastToWindows('tasks:changed');
   });
 
   // 获取任务列表
@@ -162,6 +220,10 @@ export function registerTaskHandlers() {
       conditions.push(eq(tasks.dueDate, filters.dueDate));
     }
 
+    if (filters.listId) {
+      conditions.push(eq(tasks.listId, filters.listId));
+    }
+
     if (filters.parentId !== undefined) {
       if (filters.parentId === null) {
         conditions.push(isNull(tasks.parentId));
@@ -176,8 +238,15 @@ export function registerTaskHandlers() {
       query = query.where(and(...conditions)) as any;
     }
 
-    const result = await query;
-    return result;
+    let result = await query;
+
+    if (filters.tagId) {
+      const relations = await db.select().from(taskTags).where(eq(taskTags.tagId, filters.tagId));
+      const taskIds = new Set(relations.map((relation) => relation.taskId));
+      result = result.filter((task) => taskIds.has(task.id));
+    }
+
+    return await enrichTasksWithTags(db, result);
   });
 
   // 搜索任务
@@ -189,9 +258,10 @@ export function registerTaskHandlers() {
       .where(
         or(
           like(tasks.title, `%${searchQuery}%`),
-          like(tasks.description, `%${searchQuery}%`)
+          like(tasks.description, `%${searchQuery}%`),
+          like(tasks.notes, `%${searchQuery}%`)
         )
       );
-    return result;
+    return await enrichTasksWithTags(db, result);
   });
 }

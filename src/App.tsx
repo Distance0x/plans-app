@@ -6,22 +6,27 @@ import {
   Clock,
   ChevronRight,
   ChevronDown,
-  Plus,
   Grid,
   Target,
-  Search
+  Search,
+  Plus,
+  Trash2,
+  Minimize2,
+  Maximize2,
+  X
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
 import { TaskDetailPanel } from './components/tasks/TaskDetailPanel';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
+// import { MascotWidget } from './components/mascot';
 import { useTaskStore } from './stores/task-store';
 import { useTimerStore } from './stores/timer-store';
 import { useSettingsStore, type ThemeMode } from './stores/settings-store';
 import { useEffect } from 'react';
 import { cn } from './lib/utils';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'search' | 'group';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'search' | 'group' | 'list' | 'tag';
 
 interface SidebarGroup {
   id: string;
@@ -33,12 +38,18 @@ interface SidebarGroup {
 }
 
 function App() {
-  const { tasks, fetchTasks, setFocusedTask } = useTaskStore();
+  const { tasks, lists, tags, fetchTasks, fetchLists, fetchTags, createList, deleteList, setFocusedTask } = useTaskStore();
   const { start } = useTimerStore();
   const { theme, loadSettings, updateSettings } = useSettingsStore();
   const [currentView, setCurrentView] = useState<ViewType>('today');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedListId, setSelectedListId] = useState<string>('inbox');
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const [newListName, setNewListName] = useState('');
+  const [listPendingDelete, setListPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [listDeleteError, setListDeleteError] = useState('');
+  const [showFloatingMenu, setShowFloatingMenu] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['today-tasks']));
   const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
   const [sidebarLabels, setSidebarLabels] = useState<Record<string, string>>(() => {
@@ -51,8 +62,10 @@ function App() {
 
   useEffect(() => {
     fetchTasks();
+    fetchLists();
+    fetchTags();
     loadSettings();
-  }, [fetchTasks, loadSettings]);
+  }, [fetchLists, fetchTags, fetchTasks, loadSettings]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -138,6 +151,7 @@ function App() {
   });
 
   const inboxTasks = tasks; // 收集箱显示所有任务
+  const activeLists = lists.filter((list) => !list.archivedAt);
 
   const pendingTasks = tasks.filter(t => t.status === 'todo');
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
@@ -200,12 +214,30 @@ function App() {
       return inProgressTasks;
     } else if (selectedGroup === 'completed') {
       return completedTasks;
+    } else if (currentView === 'list') {
+      return tasks.filter((task) => (task.listId || 'inbox') === selectedListId);
+    } else if (currentView === 'tag' && selectedTagId) {
+      return tasks.filter((task) => task.tags?.some((tag) => tag.id === selectedTagId));
     }
     return tasks;
   };
 
   const filteredTasks = getFilteredTasks();
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) || filteredTasks[0] || null;
+  const selectedList = activeLists.find((list) => list.id === selectedListId);
+  const selectedTag = tags.find((tag) => tag.id === selectedTagId);
+  const taskListTitle =
+    currentView === 'search'
+      ? '搜索任务'
+      : currentView === 'list'
+        ? selectedList?.name || '清单'
+        : currentView === 'tag'
+          ? `#${selectedTag?.name || '标签'}`
+          : currentView === 'recent'
+            ? '最近7天'
+            : currentView === 'inbox'
+              ? '收集箱'
+              : '今天';
 
   useEffect(() => {
     if (currentView === 'calendar' || currentView === 'pomodoro') return;
@@ -222,6 +254,55 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
+      {/* 自定义标题栏 - 可拖拽 */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 40,
+          WebkitAppRegion: 'drag',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingRight: 8,
+          background: 'transparent',
+        } as React.CSSProperties}
+      >
+        {/* 窗口控制按钮 */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            WebkitAppRegion: 'no-drag',
+          } as React.CSSProperties}
+        >
+          <button
+            onClick={() => window.electron?.window?.minimize()}
+            className="w-8 h-8 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 flex items-center justify-center transition-colors"
+            title="最小化"
+          >
+            <Minimize2 className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </button>
+          <button
+            onClick={() => window.electron?.window?.maximize()}
+            className="w-8 h-8 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 flex items-center justify-center transition-colors"
+            title="最大化"
+          >
+            <Maximize2 className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </button>
+          <button
+            onClick={() => window.electron?.window?.close()}
+            className="w-8 h-8 rounded-lg hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+            title="关闭"
+          >
+            <X className="w-4 h-4 text-gray-600 dark:text-gray-400 hover:text-white" />
+          </button>
+        </div>
+      </div>
+
       {/* 最左侧图标栏 */}
       <div className="w-16 gradient-primary shadow-lg flex flex-col items-center py-4 space-y-4">
         <button
@@ -456,6 +537,120 @@ function App() {
             )}
           </div>
 
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <span>清单</span>
+            </div>
+            <div className="space-y-1">
+              {activeLists.map((list) => {
+                const count = tasks.filter((task) => (task.listId || 'inbox') === list.id && task.status !== 'completed').length;
+                return (
+                  <div
+                    key={list.id}
+                    className={cn(
+                      'group flex items-center gap-1 rounded-xl transition-all text-sm hover-lift',
+                      currentView === 'list' && selectedListId === list.id
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                        : 'hover:bg-gray-100/70 dark:hover:bg-gray-700/40 text-gray-700 dark:text-gray-300'
+                    )}
+                  >
+                    <button
+                      onClick={() => {
+                        setCurrentView('list');
+                        setSelectedListId(list.id);
+                        setSelectedTagId(null);
+                        setSelectedGroup(null);
+                      }}
+                      className="flex min-w-0 flex-1 items-center justify-between px-4 py-2.5"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: list.color || '#3B82F6' }} />
+                        <span className="truncate">{list.name}</span>
+                      </span>
+                      <span className="text-xs text-gray-500">{count}</span>
+                    </button>
+                    {list.id !== 'inbox' && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setListDeleteError('');
+                          setListPendingDelete({ id: list.id, name: list.name });
+                        }}
+                        className={cn(
+                          'mr-2 rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100',
+                          currentView === 'list' && selectedListId === list.id
+                            ? 'text-white/80 hover:bg-white/20'
+                            : 'text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30'
+                        )}
+                        title="删除清单"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <form
+              className="flex gap-2 px-1"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const normalizedName = newListName.trim();
+                if (!normalizedName) return;
+
+                const list = await createList({ name: normalizedName });
+                if (list) {
+                  setNewListName('');
+                  setCurrentView('list');
+                  setSelectedListId(list.id);
+                }
+              }}
+            >
+              <input
+                value={newListName}
+                onChange={(event) => setNewListName(event.target.value)}
+                placeholder="新清单"
+                className="min-w-0 flex-1 rounded-lg border border-gray-200/60 bg-white/60 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white"
+              />
+              <button
+                type="submit"
+                className="rounded-lg border border-gray-200/60 px-2 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+                title="创建清单"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+
+          {tags.length > 0 && (
+            <div className="space-y-2">
+              <div className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                标签
+              </div>
+              <div className="flex flex-wrap gap-2 px-1">
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => {
+                      setCurrentView('tag');
+                      setSelectedTagId(tag.id);
+                      setSelectedGroup(null);
+                    }}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs transition-colors',
+                      currentView === 'tag' && selectedTagId === tag.id
+                        ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/50'
+                        : 'border-gray-200/70 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800'
+                    )}
+                  >
+                    #{tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* 底部工具 */}
@@ -567,6 +762,8 @@ function App() {
                         </>
                       )}
                       {currentView === 'search' && '🔍 搜索'}
+                      {currentView === 'list' && `📁 ${selectedList?.name || '清单'}`}
+                      {currentView === 'tag' && `# ${selectedTag?.name || '标签'}`}
                       {selectedGroup === 'pending' && '🔥 待处理'}
                       {selectedGroup === 'in-progress' && '⚡ 处理中'}
                       {selectedGroup === 'completed' && '✅ 已完成'}
@@ -575,26 +772,64 @@ function App() {
                       共 {filteredTasks.length} 个任务
                     </p>
                   </div>
-                  <button
-                    onClick={() => window.dispatchEvent(new Event('focus-quick-add'))}
-                    className="flex items-center gap-2 px-5 py-3 gradient-primary text-white rounded-xl hover:shadow-xl transition-all hover-lift font-medium"
-                  >
-                    <Plus className="w-5 h-5" />
-                    添加任务
-                  </button>
+                  {currentView === 'list' && selectedList && selectedList.id !== 'inbox' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setListDeleteError('');
+                        setListPendingDelete({ id: selectedList.id, name: selectedList.name });
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      删除清单
+                    </button>
+                  )}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowFloatingMenu((value) => !value)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/50"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      浮窗
+                    </button>
+                    {showFloatingMenu && (
+                      <div className="absolute right-0 top-11 z-30 w-44 overflow-hidden rounded-2xl border border-white/50 bg-white/95 p-1 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/95">
+                        {[
+                          ['day', '今日浮窗'],
+                          ['week', '周视图浮窗'],
+                          ['pomodoro', '番茄钟浮窗'],
+                        ].map(([mode, label]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={async () => {
+                              setShowFloatingMenu(false);
+                              await window.electron.floating.open(mode as 'day' | 'week' | 'pomodoro');
+                            }}
+                            className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* 内容区域 */}
               <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-white/30 to-gray-50/30 dark:from-gray-800/30 dark:to-gray-900/30">
                 <TaskList
-                  key={currentView}
-                  title={currentView === 'search' ? '搜索任务' : '今日任务'}
+                  key={`${currentView}:${selectedListId}:${selectedTagId || ''}`}
+                  title={taskListTitle}
                   autoFocusSearch={currentView === 'search'}
                   visibleTasks={filteredTasks}
                   selectedTaskId={selectedTaskId}
                   onSelectTask={setSelectedTaskId}
                   quickAddDefaultToNow={currentView === 'today' && !selectedGroup}
+                  quickAddDefaultListId={currentView === 'list' ? selectedListId : 'inbox'}
                 />
               </div>
             </div>
@@ -603,6 +838,83 @@ function App() {
         )}
       </div>
 
+      {/* 吉祥物功能已注释 */}
+      {/* <div
+        style={{
+          position: 'fixed',
+          bottom: 20,
+          right: 20,
+          zIndex: 1000,
+        }}
+      >
+        <MascotWidget size={150} mode="simple" />
+      </div> */}
+
+      {listPendingDelete && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-2xl shadow-slate-900/20 backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/90">
+            <div className="relative p-6">
+              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-red-400/20 blur-2xl" />
+              <div className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-blue-400/20 blur-2xl" />
+
+              <div className="relative flex items-start gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-500 shadow-sm dark:bg-red-950/40 dark:text-red-300">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    删除清单
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    确定删除「{listPendingDelete.name}」吗？这个清单内的任务不会丢失，会自动移动到收集箱。
+                  </p>
+                  {listDeleteError && (
+                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                      {listDeleteError}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200/70 bg-slate-50/70 px-6 py-4 dark:border-slate-700/70 dark:bg-slate-800/50">
+              <button
+                type="button"
+                onClick={() => setListPendingDelete(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const target = listPendingDelete;
+                  if (!target) return;
+
+                  const deleted = await deleteList(target.id);
+                  if (!deleted) {
+                    setListDeleteError('删除失败。请重启应用后再试，如果仍失败说明主进程还没有加载最新 IPC。');
+                    return;
+                  }
+
+                  await fetchLists();
+                  await fetchTasks();
+
+                  if (selectedListId === target.id) {
+                    setSelectedListId('inbox');
+                    setCurrentView('inbox');
+                  }
+                  setListPendingDelete(null);
+                  setListDeleteError('');
+                }}
+                className="rounded-xl bg-gradient-to-r from-red-500 to-rose-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition-transform hover:-translate-y-0.5 hover:shadow-red-500/30"
+              >
+                删除并移动任务
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

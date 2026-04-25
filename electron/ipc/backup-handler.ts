@@ -1,7 +1,7 @@
 import { dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import { getDatabase } from '../database/db';
-import { pomodoroSessions, reminders, settings, tags, taskTags, tasks } from '../database/schema';
+import { lists, pomodoroSessions, reminders, settings, tags, taskTags, tasks } from '../database/schema';
 
 const BACKUP_VERSION = 1;
 
@@ -16,6 +16,7 @@ export function registerBackupHandlers() {
         reminders: await db.select().from(reminders),
         pomodoroSessions: await db.select().from(pomodoroSessions),
         settings: await db.select().from(settings),
+        lists: await db.select().from(lists),
         tags: await db.select().from(tags),
         taskTags: await db.select().from(taskTags),
       },
@@ -59,8 +60,23 @@ export function registerBackupHandlers() {
     await db.delete(reminders);
     await db.delete(pomodoroSessions);
     await db.delete(tasks);
+    await db.delete(lists);
     await db.delete(settings);
 
+    if (backup.data.lists?.length) {
+      await db.insert(lists).values(backup.data.lists);
+    } else {
+      const now = new Date().toISOString();
+      await db.insert(lists).values({
+        id: 'inbox',
+        name: '收集箱',
+        color: '#64748B',
+        orderIndex: 0,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     if (backup.data.tasks?.length) await db.insert(tasks).values(backup.data.tasks);
     if (backup.data.reminders?.length) await db.insert(reminders).values(backup.data.reminders);
     if (backup.data.pomodoroSessions?.length) await db.insert(pomodoroSessions).values(backup.data.pomodoroSessions);

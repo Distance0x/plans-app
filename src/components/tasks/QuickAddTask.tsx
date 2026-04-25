@@ -25,6 +25,7 @@ const priorityOptions = [
 
 interface QuickAddTaskProps {
   defaultToNow?: boolean;
+  defaultListId?: string;
 }
 
 type DatePanelMode = 'date' | 'duration';
@@ -53,7 +54,7 @@ function getCalendarDays(monthDate: Date) {
   });
 }
 
-export function QuickAddTask({ defaultToNow = false }: QuickAddTaskProps) {
+export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: QuickAddTaskProps) {
   const { createTask, fetchTasks } = useTaskStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
@@ -88,6 +89,7 @@ export function QuickAddTask({ defaultToNow = false }: QuickAddTaskProps) {
       dueDate: taskDueDate,
       dueTime: taskDueTime,
       duration: Number(duration) || 60,
+      listId: defaultListId,
       attachments,
     });
     await fetchTasks();

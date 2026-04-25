@@ -123,6 +123,14 @@ export function TaskItem({
                 🔄 重复
               </span>
             )}
+            {task.tags?.map((tag) => (
+              <span
+                key={tag.id}
+                className="text-xs px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium"
+              >
+                #{tag.name}
+              </span>
+            ))}
             {attachments.length > 0 && (
               <span className="text-xs px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
                 📎 {attachments.length}
@@ -152,6 +160,7 @@ export function TaskItem({
               createTask({
                 title,
                 parentId: task.id,
+                listId: task.listId || 'inbox',
                 priority: 'medium',
                 status: 'todo',
               })

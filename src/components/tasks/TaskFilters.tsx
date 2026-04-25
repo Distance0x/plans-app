@@ -3,6 +3,7 @@ import { Search, Filter, X } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
+import { useTaskStore } from '@/stores/task-store';
 
 interface TaskFiltersProps {
   onSearch: (query: string) => void;
@@ -11,12 +12,15 @@ interface TaskFiltersProps {
 }
 
 export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false }: TaskFiltersProps) {
+  const { lists, tags } = useTaskStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
     dueDate: '',
+    listId: '',
+    tagId: '',
   });
 
   const handleSearchChange = (value: string) => {
@@ -40,7 +44,7 @@ export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false 
   };
 
   const clearFilters = () => {
-    setFilters({ status: '', priority: '', dueDate: '' });
+    setFilters({ status: '', priority: '', dueDate: '', listId: '', tagId: '' });
     setSearchQuery('');
     onFilterChange({});
   };
@@ -77,7 +81,7 @@ export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false 
       {/* 过滤器 */}
       {showFilters && (
         <div className="glass-card p-4 rounded-lg backdrop-blur-md bg-white/70 dark:bg-gray-800/70 border border-white/30">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <Select
               label="状态"
               value={filters.status}
@@ -105,6 +109,24 @@ export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false 
               type="date"
               value={filters.dueDate}
               onChange={(e) => handleFilterChange('dueDate', e.target.value)}
+            />
+            <Select
+              label="清单"
+              value={filters.listId}
+              onChange={(e) => handleFilterChange('listId', e.target.value)}
+              options={[
+                { value: '', label: '全部' },
+                ...lists.map((list) => ({ value: list.id, label: list.name })),
+              ]}
+            />
+            <Select
+              label="标签"
+              value={filters.tagId}
+              onChange={(e) => handleFilterChange('tagId', e.target.value)}
+              options={[
+                { value: '', label: '全部' },
+                ...tags.map((tag) => ({ value: tag.id, label: `#${tag.name}` })),
+              ]}
             />
           </div>
         </div>

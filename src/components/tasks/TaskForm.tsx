@@ -40,9 +40,10 @@ function parseAttachments(value?: string | null) {
 }
 
 export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
-  const { tasks, createTask, updateTask } = useTaskStore();
+  const { tasks, lists, tags, fetchLists, fetchTags, createTag, createTask, updateTask } = useTaskStore();
   const existingTask = taskId ? tasks.find((t) => t.id === taskId) : null;
   const existingRule = parseRecurrenceRule(existingTask?.recurrenceRule);
+  const existingTagIds = existingTask?.tags?.map((tag) => tag.id) || [];
 
   const [formData, setFormData] = useState({
     title: existingTask?.title || '',
@@ -51,6 +52,9 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
     dueDate: existingTask?.dueDate || '',
     dueTime: existingTask?.dueTime || '',
     duration: String(existingTask?.duration || 60),
+    listId: existingTask?.listId || 'inbox',
+    tagIds: existingTagIds,
+    newTagName: '',
     notes: existingTask?.notes || '',
     attachments: parseAttachments(existingTask?.attachments),
     reminderAt: '',
@@ -62,6 +66,11 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    void fetchLists();
+    void fetchTags();
+  }, [fetchLists, fetchTags]);
 
   useEffect(() => {
     if (!taskId || !window.electron?.reminder) return;
@@ -109,6 +118,8 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
       dueDate: formData.dueDate,
       dueTime: formData.dueTime,
       duration: Number(formData.duration) || 60,
+      listId: formData.listId || 'inbox',
+      tagIds: formData.tagIds,
       notes: formData.notes.trim(),
       attachments: formData.attachments,
       parentId: parentId ?? existingTask?.parentId ?? undefined,
@@ -183,6 +194,70 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
               { value: 'high', label: '高' },
             ]}
           />
+
+          <Select
+            label="清单"
+            value={formData.listId}
+            onChange={(e) => setFormData({ ...formData, listId: e.target.value })}
+            options={lists.map((list) => ({
+              value: list.id,
+              label: list.name,
+            }))}
+          />
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              标签
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => {
+                const selected = formData.tagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        tagIds: selected
+                          ? formData.tagIds.filter((id) => id !== tag.id)
+                          : [...formData.tagIds, tag.id],
+                      })
+                    }
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      selected
+                        ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/50'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700'
+                    }`}
+                  >
+                    #{tag.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="新建标签"
+                value={formData.newTagName}
+                onChange={(e) => setFormData({ ...formData, newTagName: e.target.value })}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const tag = await createTag({ name: formData.newTagName });
+                  if (!tag) return;
+                  setFormData({
+                    ...formData,
+                    newTagName: '',
+                    tagIds: Array.from(new Set([...formData.tagIds, tag.id])),
+                  });
+                }}
+              >
+                添加
+              </Button>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Input

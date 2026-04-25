@@ -1,5 +1,5 @@
 import { getDatabase } from '../database/db';
-import { tasks } from '../database/schema';
+import { taskTags, tasks } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -124,6 +124,7 @@ export class RecurrenceEngine {
         updatedAt: now,
         completedAt: null,
         parentId: task.parentId,
+        listId: task.listId,
         orderIndex: task.orderIndex,
         estimatedPomodoros: task.estimatedPomodoros,
         actualPomodoros: 0,
@@ -131,6 +132,16 @@ export class RecurrenceEngine {
         recurrenceParentId: task.recurrenceParentId || taskId,
         recurrenceCount: (task.recurrenceCount || 0) + 1,
       });
+
+      const sourceTags = await db.select().from(taskTags).where(eq(taskTags.taskId, taskId));
+      if (sourceTags.length > 0) {
+        await db.insert(taskTags).values(
+          sourceTags.map((relation) => ({
+            taskId: newTaskId,
+            tagId: relation.tagId,
+          }))
+        );
+      }
 
       console.log('[RecurrenceEngine] Generated next instance:', newTaskId, 'for', taskId);
       return newTaskId;

@@ -13,6 +13,22 @@ contextBridge.exposeInMainWorld('electron', {
     search: (query: string) => ipcRenderer.invoke('task:search', query),
   },
 
+  list: {
+    list: () => ipcRenderer.invoke('list:list'),
+    create: (data: any) => ipcRenderer.invoke('list:create', data),
+    update: (id: string, updates: any) => ipcRenderer.invoke('list:update', id, updates),
+    delete: (id: string) => ipcRenderer.invoke('list:delete', id),
+  },
+
+  tag: {
+    list: () => ipcRenderer.invoke('tag:list'),
+    create: (data: any) => ipcRenderer.invoke('tag:create', data),
+    update: (id: string, updates: any) => ipcRenderer.invoke('tag:update', id, updates),
+    delete: (id: string) => ipcRenderer.invoke('tag:delete', id),
+    setTaskTags: (taskId: string, tagIds: string[]) =>
+      ipcRenderer.invoke('tag:set-task-tags', taskId, tagIds),
+  },
+
   // 番茄钟相关 API
   timer: {
     start: (taskId?: string) => ipcRenderer.invoke('timer:start', taskId),
@@ -46,6 +62,21 @@ contextBridge.exposeInMainWorld('electron', {
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),
     import: () => ipcRenderer.invoke('backup:import'),
+  },
+
+  // 窗口控制 API
+  window: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    maximize: () => ipcRenderer.send('window:maximize'),
+    close: () => ipcRenderer.send('window:close'),
+  },
+
+  floating: {
+    open: (mode: 'day' | 'week' | 'pomodoro') => ipcRenderer.invoke('floating:open', mode),
+    close: () => ipcRenderer.invoke('floating:close'),
+    showMain: () => ipcRenderer.invoke('floating:show-main'),
+    setAlwaysOnTop: (enabled: boolean) =>
+      ipcRenderer.invoke('floating:set-always-on-top', enabled),
   },
 
   file: {
