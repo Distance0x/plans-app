@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import {
+  Bell,
   CheckSquare,
+  CheckCircle2,
   Calendar,
   Inbox,
   Clock,
   ChevronRight,
   ChevronDown,
   Grid,
-  Target,
-  Search,
   Plus,
   Trash2,
+  TimerReset,
   Minimize2,
   Maximize2,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
 import { TaskDetailPanel } from './components/tasks/TaskDetailPanel';
@@ -39,6 +41,18 @@ interface SidebarGroup {
   expanded?: boolean;
 }
 
+interface ActiveReminder {
+  id: string;
+  reminder: {
+    id: string;
+    taskId: string;
+    triggerAt: string;
+    type: 'due' | 'before_due' | 'custom';
+    channel?: 'notification' | 'sound' | 'both';
+  };
+  task: Task;
+}
+
 function App() {
   const {
     tasks,
@@ -52,10 +66,17 @@ function App() {
     createList,
     deleteList,
     deleteSavedFilter,
+    updateTask,
     setFocusedTask,
   } = useTaskStore();
   const { start } = useTimerStore();
-  const { theme, loadSettings, updateSettings } = useSettingsStore();
+  const {
+    theme,
+    defaultReminderOffsets,
+    defaultReminderChannel,
+    loadSettings,
+    updateSettings,
+  } = useSettingsStore();
   const [currentView, setCurrentView] = useState<ViewType>('today');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -65,6 +86,7 @@ function App() {
   const [newListName, setNewListName] = useState('');
   const [listPendingDelete, setListPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [listDeleteError, setListDeleteError] = useState('');
+  const [activeReminders, setActiveReminders] = useState<ActiveReminder[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['today-tasks']));
   const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
   const [sidebarLabels, setSidebarLabels] = useState<Record<string, string>>(() => {
@@ -105,7 +127,22 @@ function App() {
     const handleFocusTask = (taskId: string) => {
       setCurrentView('inbox');
       setSelectedGroup(null);
+      setSelectedTaskId(taskId);
       setFocusedTask(taskId);
+    };
+
+    const handleReminderFire = (payload: { reminder: ActiveReminder['reminder']; task: Task }) => {
+      setActiveReminders((current) => {
+        if (current.some((item) => item.reminder.id === payload.reminder.id)) return current;
+        return [
+          ...current,
+          {
+            id: payload.reminder.id,
+            reminder: payload.reminder,
+            task: payload.task,
+          },
+        ].slice(-3);
+      });
     };
 
     const handleQuickAddTask = () => {
@@ -137,17 +174,49 @@ function App() {
     };
 
     window.electron.on('focus-task', handleFocusTask);
+    window.electron.on('reminder:fire', handleReminderFire);
     window.electron.on('quick-add-task', handleQuickAddTask);
     window.electron.on('tray-start-pomodoro', handleTrayStartPomodoro);
     window.electron.on('play-notification-sound', handleNotificationSound);
 
     return () => {
       window.electron.off('focus-task', handleFocusTask);
+      window.electron.off('reminder:fire', handleReminderFire);
       window.electron.off('quick-add-task', handleQuickAddTask);
       window.electron.off('tray-start-pomodoro', handleTrayStartPomodoro);
       window.electron.off('play-notification-sound', handleNotificationSound);
     };
   }, [setFocusedTask, start]);
+
+  const dismissReminder = (reminderId: string) => {
+    setActiveReminders((current) => current.filter((item) => item.reminder.id !== reminderId));
+  };
+
+  const openReminderTask = (taskId: string, reminderId?: string) => {
+    setCurrentView('inbox');
+    setSelectedGroup(null);
+    setSelectedTaskId(taskId);
+    setFocusedTask(taskId);
+    if (reminderId) dismissReminder(reminderId);
+  };
+
+  const completeReminderTask = async (reminder: ActiveReminder) => {
+    await updateTask(reminder.task.id, { status: 'completed' });
+    await fetchTasks();
+    dismissReminder(reminder.reminder.id);
+  };
+
+  const snoozeReminder = async (reminder: ActiveReminder) => {
+    const triggerAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    await window.electron.reminder.create(
+      reminder.task.id,
+      triggerAt,
+      'custom',
+      reminder.reminder.channel || 'notification'
+    );
+    await fetchTasks();
+    dismissReminder(reminder.reminder.id);
+  };
 
   // 计算任务数量
   const todayTasks = tasks.filter(t => {
@@ -216,6 +285,8 @@ function App() {
     };
     await updateSettings({ theme: nextTheme[theme] });
   };
+
+  const defaultReminderValue = defaultReminderOffsets[0] ?? 15;
 
   const getFilteredTasks = () => {
     if (currentView === 'today') {
@@ -372,41 +443,6 @@ function App() {
           <Clock className="w-5 h-5" />
         </button>
 
-        <button
-          onClick={() => setCurrentView('stats')}
-          className={cn(
-            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
-            currentView === 'stats'
-              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
-          )}
-          title="统计"
-        >
-          <Grid className="w-5 h-5" />
-        </button>
-
-        <button
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/50 hover:bg-white/20 hover:text-white/80 transition-all hover-lift"
-          title="目标"
-        >
-          <Target className="w-5 h-5" />
-        </button>
-
-        <button
-          onClick={() => {
-            setCurrentView('search');
-            setSelectedGroup(null);
-          }}
-          className={cn(
-            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
-            currentView === 'search'
-              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
-          )}
-          title="搜索"
-        >
-          <Search className="w-5 h-5" />
-        </button>
       </div>
 
       {/* 左侧边栏 */}
@@ -748,6 +784,36 @@ function App() {
 
         {/* 底部工具 */}
         <div className="p-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/30 dark:bg-gray-800/30">
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <label className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="mb-1 block">默认提醒</span>
+              <select
+                value={String(defaultReminderValue)}
+                onChange={(event) => updateSettings({ defaultReminderOffsets: [Number(event.target.value)] })}
+                className="w-full rounded-lg border border-gray-300/50 bg-white/70 px-2 py-2 text-xs text-gray-700 outline-none dark:border-gray-600/50 dark:bg-gray-900/60 dark:text-gray-200"
+              >
+                <option value="0">准时</option>
+                <option value="5">提前 5 分钟</option>
+                <option value="15">提前 15 分钟</option>
+                <option value="30">提前 30 分钟</option>
+                <option value="1440">提前 1 天</option>
+              </select>
+            </label>
+            <label className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="mb-1 block">提醒方式</span>
+              <select
+                value={defaultReminderChannel}
+                onChange={(event) =>
+                  updateSettings({ defaultReminderChannel: event.target.value as 'notification' | 'sound' | 'both' })
+                }
+                className="w-full rounded-lg border border-gray-300/50 bg-white/70 px-2 py-2 text-xs text-gray-700 outline-none dark:border-gray-600/50 dark:bg-gray-900/60 dark:text-gray-200"
+              >
+                <option value="notification">通知</option>
+                <option value="sound">声音</option>
+                <option value="both">通知 + 声音</option>
+              </select>
+            </label>
+          </div>
           <div className="flex gap-2 mb-3">
             <button
               onClick={cycleTheme}
@@ -939,6 +1005,69 @@ function App() {
       >
         <MascotWidget size={150} mode="simple" />
       </div> */}
+
+      {activeReminders.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-[10001] flex w-[min(420px,calc(100vw-2rem))] flex-col gap-3">
+          {activeReminders.map((reminder) => (
+            <div
+              key={reminder.id}
+              className="overflow-hidden rounded-2xl border border-blue-200/70 bg-white/95 shadow-2xl shadow-slate-900/15 backdrop-blur-xl dark:border-blue-900/50 dark:bg-slate-900/95"
+            >
+              <div className="flex items-start gap-3 p-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        任务提醒
+                      </p>
+                      <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">
+                        {reminder.task.title}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => dismissReminder(reminder.reminder.id)}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                      title="关闭"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openReminderTask(reminder.task.id, reminder.reminder.id)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      打开
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => snoozeReminder(reminder)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+                    >
+                      <TimerReset className="h-3.5 w-3.5" />
+                      稍后 10 分钟
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => completeReminderTask(reminder)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      完成
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {listPendingDelete && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">

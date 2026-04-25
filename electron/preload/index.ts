@@ -1,6 +1,8 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 console.log('[Preload] Script loaded successfully!');
+
+const listenerMap = new Map<string, Map<(...args: any[]) => void, (...args: any[]) => void>>();
 
 // 暴露安全的 API 到渲染进程
 contextBridge.exposeInMainWorld('electron', {
@@ -89,14 +91,22 @@ contextBridge.exposeInMainWorld('electron', {
 
   file: {
     selectAttachments: () => ipcRenderer.invoke('file:select-attachments'),
+    openAttachment: (filePath: string) => ipcRenderer.invoke('file:open-attachment', filePath),
   },
 
   // 事件监听
   on: (channel: string, callback: (...args: any[]) => void) => {
-    ipcRenderer.on(channel, (_, ...args) => callback(...args));
+    const wrapped = (_: IpcRendererEvent, ...args: any[]) => callback(...args);
+    if (!listenerMap.has(channel)) listenerMap.set(channel, new Map());
+    listenerMap.get(channel)!.set(callback, wrapped);
+    ipcRenderer.on(channel, wrapped);
   },
 
   off: (channel: string, callback: (...args: any[]) => void) => {
-    ipcRenderer.removeListener(channel, callback);
+    const wrapped = listenerMap.get(channel)?.get(callback);
+    if (!wrapped) return;
+
+    ipcRenderer.removeListener(channel, wrapped);
+    listenerMap.get(channel)?.delete(callback);
   },
 });

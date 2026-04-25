@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RecurrenceRule, useTaskStore } from '@/stores/task-store';
+import { type ReminderChannel, useSettingsStore } from '@/stores/settings-store';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Select } from '../ui/Select';
@@ -51,6 +52,17 @@ function getAttachmentKey(value: any) {
   return typeof value === 'string' ? value : value?.storedPath || value?.sourcePath || value?.originalName;
 }
 
+function getAttachmentPath(value: any) {
+  return typeof value === 'string' ? value : value?.storedPath;
+}
+
+function formatAttachmentSize(value: any) {
+  const size = Number(value?.size);
+  if (!Number.isFinite(size) || size <= 0) return '';
+  if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
 const reminderOffsetOptions = [
   { value: 0, label: '准时' },
   { value: 5, label: '提前 5 分钟' },
@@ -71,6 +83,7 @@ const weekDayOptions = [
 
 export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
   const { tasks, lists, tags, fetchLists, fetchTags, createTag, createTask, updateTask } = useTaskStore();
+  const { defaultReminderOffsets, defaultReminderChannel } = useSettingsStore();
   const existingTask = taskId ? tasks.find((t) => t.id === taskId) : null;
   const existingRule = parseRecurrenceRule(existingTask?.recurrenceRule);
   const existingTagIds = existingTask?.tags?.map((tag) => tag.id) || [];
@@ -88,13 +101,16 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
     notes: existingTask?.notes || '',
     attachments: parseAttachments(existingTask?.attachments),
     reminderAt: '',
-    reminderOffsets: [15],
-    reminderChannel: 'notification',
+    reminderOffsets: existingTask ? [15] : defaultReminderOffsets,
+    reminderChannel: existingTask ? 'notification' : defaultReminderChannel,
     recurrenceFrequency: existingRule?.frequency || 'none',
     recurrenceInterval: String(existingRule?.interval || 1),
     recurrenceDaysOfWeek: existingRule?.daysOfWeek || [],
+    recurrenceLastDayOfMonth: Boolean(existingRule?.lastDayOfMonth),
     recurrenceEndDate: existingRule?.endDate || '',
     recurrenceCount: existingRule?.count ? String(existingRule.count) : '',
+    recurrenceExceptionDate: '',
+    recurrenceExceptions: existingRule?.exceptions || [],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -164,8 +180,15 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
               formData.recurrenceFrequency === 'weekly' && formData.recurrenceDaysOfWeek.length > 0
                 ? formData.recurrenceDaysOfWeek
                 : undefined,
+            dayOfMonth:
+              formData.recurrenceFrequency === 'monthly' && !formData.recurrenceLastDayOfMonth && formData.dueDate
+                ? new Date(`${formData.dueDate}T00:00:00`).getDate()
+                : undefined,
+            lastDayOfMonth:
+              formData.recurrenceFrequency === 'monthly' ? formData.recurrenceLastDayOfMonth : undefined,
             endDate: formData.recurrenceEndDate || undefined,
             count: formData.recurrenceCount ? Number(formData.recurrenceCount) : undefined,
+            exceptions: formData.recurrenceExceptions.length > 0 ? formData.recurrenceExceptions : undefined,
           };
 
     const payload = {
@@ -344,7 +367,7 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
             <Select
               label="提醒方式"
               value={formData.reminderChannel}
-              onChange={(e) => setFormData({ ...formData, reminderChannel: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, reminderChannel: e.target.value as ReminderChannel })}
               options={[
                 { value: 'notification', label: '系统通知' },
                 { value: 'sound', label: '声音' },
@@ -406,6 +429,7 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
                 { value: 'daily', label: '每天' },
                 { value: 'weekly', label: '每周' },
                 { value: 'monthly', label: '每月' },
+                { value: 'yearly', label: '每年' },
               ]}
             />
             <Input
@@ -454,6 +478,18 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
                 </div>
               )}
 
+              {formData.recurrenceFrequency === 'monthly' && (
+                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={formData.recurrenceLastDayOfMonth}
+                    onChange={(e) => setFormData({ ...formData, recurrenceLastDayOfMonth: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  每月最后一天重复
+                </label>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="结束日期"
@@ -468,6 +504,55 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
                   value={formData.recurrenceCount}
                   onChange={(e) => setFormData({ ...formData, recurrenceCount: e.target.value })}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  跳过日期
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={formData.recurrenceExceptionDate}
+                    onChange={(e) => setFormData({ ...formData, recurrenceExceptionDate: e.target.value })}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (!formData.recurrenceExceptionDate) return;
+                      setFormData({
+                        ...formData,
+                        recurrenceExceptionDate: '',
+                        recurrenceExceptions: Array.from(new Set([
+                          ...formData.recurrenceExceptions,
+                          formData.recurrenceExceptionDate,
+                        ])).sort(),
+                      });
+                    }}
+                  >
+                    添加
+                  </Button>
+                </div>
+                {formData.recurrenceExceptions.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.recurrenceExceptions.map((date) => (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            recurrenceExceptions: formData.recurrenceExceptions.filter((item) => item !== date),
+                          })
+                        }
+                        className="rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-500 hover:border-red-200 hover:text-red-500 dark:border-gray-700"
+                      >
+                        {date} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -502,9 +587,25 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
                     key={getAttachmentKey(filePath)}
                     className="flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-300"
                   >
-                    <span className="min-w-0 flex-1 truncate" title={typeof filePath === 'string' ? filePath : filePath?.storedPath}>
-                      {getAttachmentName(filePath)}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate" title={getAttachmentPath(filePath)}>
+                        {getAttachmentName(filePath)}
+                      </div>
+                      {formatAttachmentSize(filePath) && (
+                        <div className="text-xs text-gray-400">{formatAttachmentSize(filePath)}</div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const targetPath = getAttachmentPath(filePath);
+                        if (!targetPath) return;
+                        await window.electron.file.openAttachment(targetPath);
+                      }}
+                      className="text-blue-500 hover:text-blue-600"
+                    >
+                      打开
+                    </button>
                     <button
                       type="button"
                       onClick={() =>

@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { cn } from '@/lib/utils';
 import { useTaskStore } from '@/stores/task-store';
 
-type ViewMode = 'month' | 'week' | 'day';
+type ViewMode = 'month' | 'week' | 'day' | 'agenda';
 
 interface CalendarProps {
   tasks: Array<{
@@ -21,8 +21,10 @@ interface CalendarProps {
 export function Calendar({ tasks }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [hideCompleted, setHideCompleted] = useState(false);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const { updateTask } = useTaskStore();
+  const visibleTasks = hideCompleted ? tasks.filter((task) => task.status !== 'completed') : tasks;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -35,7 +37,7 @@ export function Calendar({ tasks }: CalendarProps) {
       const newDate = new Date(currentDate);
       newDate.setDate(newDate.getDate() - 7);
       setCurrentDate(newDate);
-    } else {
+    } else if (viewMode === 'day' || viewMode === 'agenda') {
       const newDate = new Date(currentDate);
       newDate.setDate(newDate.getDate() - 1);
       setCurrentDate(newDate);
@@ -50,7 +52,7 @@ export function Calendar({ tasks }: CalendarProps) {
       const newDate = new Date(currentDate);
       newDate.setDate(newDate.getDate() + 7);
       setCurrentDate(newDate);
-    } else {
+    } else if (viewMode === 'day' || viewMode === 'agenda') {
       const newDate = new Date(currentDate);
       newDate.setDate(newDate.getDate() + 1);
       setCurrentDate(newDate);
@@ -70,6 +72,7 @@ export function Calendar({ tasks }: CalendarProps) {
           {viewMode === 'month' && `${year} 年 ${monthNames[month]}`}
           {viewMode === 'week' && `${year} 年 ${monthNames[month]} 第 ${Math.ceil(currentDate.getDate() / 7)} 周`}
           {viewMode === 'day' && `${year} 年 ${month + 1} 月 ${currentDate.getDate()} 日`}
+          {viewMode === 'agenda' && '议程'}
         </h2>
 
         <div className="flex gap-2">
@@ -96,7 +99,22 @@ export function Calendar({ tasks }: CalendarProps) {
             >
               日视图
             </Button>
+            <Button
+              variant={viewMode === 'agenda' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('agenda')}
+            >
+              议程
+            </Button>
           </div>
+
+          <Button
+            variant={hideCompleted ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setHideCompleted((value) => !value)}
+          >
+            隐藏已完成
+          </Button>
 
           {/* 导航按钮 */}
           <Button
@@ -119,17 +137,20 @@ export function Calendar({ tasks }: CalendarProps) {
       {viewMode === 'month' && (
         <MonthView
           currentDate={currentDate}
-          tasks={tasks}
+          tasks={visibleTasks}
           draggedTask={draggedTask}
           setDraggedTask={setDraggedTask}
           updateTask={updateTask}
         />
       )}
       {viewMode === 'week' && (
-        <WeekView currentDate={currentDate} tasks={tasks} updateTask={updateTask} />
+        <WeekView currentDate={currentDate} tasks={visibleTasks} updateTask={updateTask} />
       )}
       {viewMode === 'day' && (
-        <DayView currentDate={currentDate} tasks={tasks} updateTask={updateTask} />
+        <DayView currentDate={currentDate} tasks={visibleTasks} updateTask={updateTask} />
+      )}
+      {viewMode === 'agenda' && (
+        <AgendaView currentDate={currentDate} tasks={visibleTasks} updateTask={updateTask} />
       )}
     </div>
   );
@@ -790,11 +811,114 @@ function DayView({ currentDate, tasks, updateTask }: any) {
   );
 }
 
+function AgendaView({ currentDate, tasks, updateTask }: any) {
+  const startDate = new Date(currentDate);
+  startDate.setDate(currentDate.getDate() - 1);
+  const days = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return date;
+  });
+
+  const getTasksForDay = (date: Date) => {
+    const dateStr = toDateKey(date);
+    return tasks
+      .filter((task: any) => task.dueDate === dateStr)
+      .sort((a: any, b: any) => (a.dueTime || '99:99').localeCompare(b.dueTime || '99:99'));
+  };
+
+  const unplannedTasks = tasks.filter((task: any) => !task.dueDate && task.status !== 'completed');
+
+  return (
+    <div className="space-y-4">
+      {unplannedTasks.length > 0 && (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-white/70 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+          <div className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200">未排期</div>
+          <div className="space-y-2">
+            {unplannedTasks.map((task: any) => (
+              <AgendaTaskRow key={task.id} task={task} updateTask={updateTask} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {days.map((date) => {
+        const dayTasks = getTasksForDay(date);
+        const dateKey = toDateKey(date);
+        return (
+          <div
+            key={dateKey}
+            className="rounded-lg border border-gray-100 bg-white/75 p-4 dark:border-gray-800 dark:bg-gray-900/55"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={async (event) => {
+              const taskId = event.dataTransfer.getData('text/plain');
+              if (!taskId) return;
+              await updateTask(taskId, { dueDate: dateKey });
+            }}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}
+                </div>
+                <div className="text-xs text-gray-400">{dateKey}</div>
+              </div>
+              <div className="text-xs text-gray-400">{dayTasks.length} 个任务</div>
+            </div>
+
+            {dayTasks.length > 0 ? (
+              <div className="space-y-2">
+                {dayTasks.map((task: any) => (
+                  <AgendaTaskRow key={task.id} task={task} updateTask={updateTask} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-400 dark:bg-gray-800/50">
+                没有安排
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AgendaTaskRow({ task, updateTask }: any) {
+  return (
+    <div
+      draggable
+      onDragStart={(event) => event.dataTransfer.setData('text/plain', task.id)}
+      className={cn(
+        'flex cursor-move items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors',
+        task.priority === 'high'
+          ? 'border-red-100 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300'
+          : 'border-gray-100 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200',
+        task.status === 'completed' && 'opacity-55 line-through'
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => updateTask(task.id, { status: task.status === 'completed' ? 'todo' : 'completed' })}
+        className="h-4 w-4 flex-shrink-0 rounded border border-current opacity-60 hover:opacity-100"
+      />
+      <div className="min-w-0 flex-1 truncate">{task.title}</div>
+      <div className="text-xs tabular-nums opacity-70">
+        {task.dueTime || '未定时'}
+      </div>
+    </div>
+  );
+}
+
 function formatClock(totalMinutes: number) {
   const safeMinutes = Math.max(0, Math.min(totalMinutes, 24 * 60));
   const hour = Math.floor(safeMinutes / 60);
   const minute = safeMinutes % 60;
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function snapDuration(minutes: number) {

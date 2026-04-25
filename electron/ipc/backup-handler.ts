@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain } from 'electron';
+import { app, dialog, ipcMain, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -118,5 +118,14 @@ export function registerBackupHandlers() {
         size: fs.statSync(storedPath).size,
       };
     });
+  });
+
+  ipcMain.handle('file:open-attachment', async (_, filePath: string) => {
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { ok: false, error: '附件文件不存在' };
+    }
+
+    const error = await shell.openPath(filePath);
+    return error ? { ok: false, error } : { ok: true };
   });
 }

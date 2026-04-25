@@ -66,6 +66,8 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
   const [openPanel, setOpenPanel] = useState<'date' | 'priority' | null>(null);
   const [datePanelMode, setDatePanelMode] = useState<DatePanelMode>('date');
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     const handleFocus = () => inputRef.current?.focus();
@@ -76,6 +78,7 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
   const submit = async () => {
     const normalizedTitle = title.trim();
     if (!normalizedTitle) return;
+    if (submitting) return;
 
     const now = new Date();
     const fallbackDueDate = defaultToNow ? formatDateKey(now) : '';
@@ -83,18 +86,35 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
     const taskDueDate = dueDate || fallbackDueDate;
     const taskDueTime = dueTime || (taskDueDate ? fallbackDueTime : '');
 
-    await createTask({
-      title: normalizedTitle,
-      priority,
-      dueDate: taskDueDate,
-      dueTime: taskDueTime,
-      duration: Number(duration) || 60,
-      listId: defaultListId,
-      attachments,
-    });
-    await fetchTasks();
-    setTitle('');
-    setAttachments([]);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const task = await createTask({
+        title: normalizedTitle,
+        priority,
+        dueDate: taskDueDate,
+        dueTime: taskDueTime,
+        duration: Number(duration) || 60,
+        listId: defaultListId,
+        attachments,
+      });
+
+      if (!task) {
+        setSubmitError('创建失败，请重试');
+        return;
+      }
+
+      await fetchTasks();
+      setTitle('');
+      setAttachments([]);
+      setOpenPanel(null);
+    } catch (error) {
+      console.error('快速创建任务失败:', error);
+      setSubmitError('创建失败，请重试');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openDatePanel = () => {
@@ -134,7 +154,15 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
   return (
     <div className="relative">
       <div className="flex items-center gap-2 rounded-lg border border-blue-500 bg-white px-3 py-2 shadow-sm dark:bg-gray-800">
-        <Plus className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={submitting || !title.trim()}
+          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700"
+          title="创建任务"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
         <input
           ref={inputRef}
           value={title}
@@ -401,6 +429,11 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
       {attachments.length > 0 && (
         <div className="mt-2 text-xs text-gray-500">
           已选 {attachments.length} 个附件
+        </div>
+      )}
+      {submitError && (
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+          {submitError}
         </div>
       )}
     </div>

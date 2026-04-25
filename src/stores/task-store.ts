@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 
 export interface RecurrenceRule {
-  frequency: 'daily' | 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
   interval: number;
   daysOfWeek?: number[];
+  dayOfMonth?: number;
+  lastDayOfMonth?: boolean;
   endDate?: string;
   count?: number;
+  exceptions?: string[];
 }
 
 export interface Task {
@@ -261,19 +264,24 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       const { reminderAt, reminderOffsets, reminderChannel, ...taskData } = data;
       const task = await window.electron.task.create(taskData);
 
-      for (const reminder of getReminderRequests({ ...data, reminderAt, reminderOffsets })) {
-        await window.electron.reminder.create(
-          task.id,
-          reminder.triggerAt,
-          reminder.type,
-          reminderChannel || 'notification'
-        );
+      try {
+        for (const reminder of getReminderRequests({ ...data, reminderAt, reminderOffsets })) {
+          await window.electron.reminder.create(
+            task.id,
+            reminder.triggerAt,
+            reminder.type,
+            reminderChannel || 'notification'
+          );
+        }
+      } catch (reminderError) {
+        console.error('创建提醒失败，任务已保留:', reminderError);
       }
 
       set((state) => ({
         tasks: [...state.tasks, task],
         loading: false,
       }));
+      await get().fetchTasks();
       return task;
     } catch (error: any) {
       set({ error: error.message, loading: false });
@@ -296,20 +304,24 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         'dueDate' in updates ||
         'dueTime' in updates
       ) {
-        await window.electron.reminder.cancelTask(id);
+        try {
+          await window.electron.reminder.cancelTask(id);
 
-        for (const reminder of getReminderRequests({
-          ...updated,
-          ...updates,
-          reminderAt,
-          reminderOffsets,
-        })) {
-          await window.electron.reminder.create(
-            id,
-            reminder.triggerAt,
-            reminder.type,
-            reminderChannel || 'notification'
-          );
+          for (const reminder of getReminderRequests({
+            ...updated,
+            ...updates,
+            reminderAt,
+            reminderOffsets,
+          })) {
+            await window.electron.reminder.create(
+              id,
+              reminder.triggerAt,
+              reminder.type,
+              reminderChannel || 'notification'
+            );
+          }
+        } catch (reminderError) {
+          console.error('更新提醒失败，任务更新已保留:', reminderError);
         }
       }
 

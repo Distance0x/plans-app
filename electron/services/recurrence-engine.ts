@@ -4,23 +4,62 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export interface RecurrenceRule {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  interval: number; // 每 N 天/周/月
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval: number; // 每 N 天/周/月/年
   daysOfWeek?: number[]; // 0-6，周日到周六（仅 weekly）
+  dayOfMonth?: number;
+  lastDayOfMonth?: boolean;
   endDate?: string; // ISO 8601
   count?: number; // 重复 N 次
+  exceptions?: string[];
+}
+
+function parseLocalDate(value: string) {
+  const [datePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatLocalDate(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function getLastDayOfMonth(year: number, monthIndex: number) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function addMonths(date: Date, months: number, preferredDay: number, lastDayOfMonth?: boolean) {
+  const next = new Date(date);
+  next.setDate(1);
+  next.setMonth(date.getMonth() + months);
+  const lastDay = getLastDayOfMonth(next.getFullYear(), next.getMonth());
+  next.setDate(lastDayOfMonth ? lastDay : Math.min(preferredDay, lastDay));
+  return next;
+}
+
+function addYears(date: Date, years: number) {
+  const next = new Date(date);
+  const preferredDay = date.getDate();
+  next.setFullYear(date.getFullYear() + years, date.getMonth(), 1);
+  next.setDate(Math.min(preferredDay, getLastDayOfMonth(next.getFullYear(), next.getMonth())));
+  return next;
 }
 
 export class RecurrenceEngine {
   // 计算下一次重复日期
   static calculateNextDate(currentDate: string, rule: RecurrenceRule): string | null {
-    const current = new Date(currentDate);
+    const current = parseLocalDate(currentDate);
     let next: Date;
+    const interval = Math.max(1, Number(rule.interval) || 1);
 
     switch (rule.frequency) {
       case 'daily':
         next = new Date(current);
-        next.setDate(current.getDate() + rule.interval);
+        next.setDate(current.getDate() + interval);
         break;
 
       case 'weekly':
@@ -36,22 +75,25 @@ export class RecurrenceEngine {
             const startOfWeek = new Date(current);
             startOfWeek.setDate(current.getDate() - currentDay);
             next = new Date(startOfWeek);
-            next.setDate(startOfWeek.getDate() + rule.interval * 7 + sortedDays[0]);
+            next.setDate(startOfWeek.getDate() + interval * 7 + sortedDays[0]);
           }
         } else {
           next = new Date(current);
-          next.setDate(current.getDate() + rule.interval * 7);
+          next.setDate(current.getDate() + interval * 7);
         }
         break;
 
       case 'monthly':
-        next = new Date(current);
-        next.setMonth(current.getMonth() + rule.interval);
+        next = addMonths(
+          current,
+          interval,
+          rule.dayOfMonth || current.getDate(),
+          rule.lastDayOfMonth
+        );
+        break;
 
-        // 处理月底情况（如 1月31日 -> 2月28日）
-        if (next.getDate() !== current.getDate()) {
-          next.setDate(0); // 设置为上个月的最后一天
-        }
+      case 'yearly':
+        next = addYears(current, interval);
         break;
 
       default:
@@ -59,11 +101,18 @@ export class RecurrenceEngine {
     }
 
     // 检查是否超过结束日期
-    if (rule.endDate && next.toISOString() > rule.endDate) {
+    let nextDate = formatLocalDate(next);
+    while (rule.exceptions?.includes(nextDate)) {
+      const later = this.calculateNextDate(nextDate, { ...rule, exceptions: [] });
+      if (!later) return null;
+      nextDate = later;
+    }
+
+    if (rule.endDate && nextDate > rule.endDate) {
       return null;
     }
 
-    return next.toISOString().split('T')[0];
+    return nextDate;
   }
 
   // 任务完成后生成下一次实例
@@ -216,12 +265,16 @@ export class RecurrenceEngine {
       return false;
     }
 
+    if (rule.dayOfMonth && (rule.dayOfMonth < 1 || rule.dayOfMonth > 31)) {
+      return false;
+    }
+
     return true;
   }
 
   // 格式化重复规则为人类可读文本
   static formatRule(rule: RecurrenceRule): string {
-    const { frequency, interval, daysOfWeek, endDate, count } = rule;
+    const { frequency, interval, daysOfWeek, dayOfMonth, lastDayOfMonth, endDate, count } = rule;
 
     let text = '';
 
@@ -237,6 +290,13 @@ export class RecurrenceEngine {
       }
     } else if (frequency === 'monthly') {
       text = interval === 1 ? '每月' : `每 ${interval} 个月`;
+      if (lastDayOfMonth) {
+        text += '最后一天';
+      } else if (dayOfMonth) {
+        text += `${dayOfMonth} 日`;
+      }
+    } else if (frequency === 'yearly') {
+      text = interval === 1 ? '每年' : `每 ${interval} 年`;
     }
 
     if (endDate) {

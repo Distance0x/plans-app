@@ -71,6 +71,7 @@ export interface ElectronAPI {
       sourcePath: string;
       size: number;
     }>>;
+    openAttachment: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
   };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
