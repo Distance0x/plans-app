@@ -24,6 +24,7 @@ export function TaskList({
   quickAddDefaultListId = 'inbox',
 }: TaskListProps) {
   const { tasks, loading, error, fetchTasks, searchTasks } = useTaskStore();
+  const { createSavedFilter } = useTaskStore();
 
   useEffect(() => {
     fetchTasks();
@@ -72,6 +73,9 @@ export function TaskList({
         onSearch={handleSearch}
         onFilterChange={handleFilterChange}
         autoFocusSearch={autoFocusSearch}
+        onSaveFilter={async (name, filters) => {
+          await createSavedFilter({ name, rules: filters });
+        }}
       />
 
       {/* 任务列表 */}

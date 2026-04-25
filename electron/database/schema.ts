@@ -65,6 +65,14 @@ export const taskTags = sqliteTable('task_tags', {
   tagId: text('tag_id').notNull(),
 });
 
+export const savedFilters = sqliteTable('saved_filters', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  rules: text('rules').notNull(), // JSON string
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 export const reminders = sqliteTable('reminders', {
   id: text('id').primaryKey(),
   taskId: text('task_id').notNull(),

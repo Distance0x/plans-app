@@ -1,7 +1,9 @@
-import { dialog, ipcMain } from 'electron';
+import { app, dialog, ipcMain } from 'electron';
 import fs from 'fs';
+import path from 'path';
+import { randomUUID } from 'crypto';
 import { getDatabase } from '../database/db';
-import { lists, pomodoroSessions, reminders, settings, tags, taskTags, tasks } from '../database/schema';
+import { lists, pomodoroSessions, reminders, savedFilters, settings, tags, taskTags, tasks } from '../database/schema';
 
 const BACKUP_VERSION = 1;
 
@@ -19,6 +21,7 @@ export function registerBackupHandlers() {
         lists: await db.select().from(lists),
         tags: await db.select().from(tags),
         taskTags: await db.select().from(taskTags),
+        savedFilters: await db.select().from(savedFilters),
       },
     };
 
@@ -57,6 +60,7 @@ export function registerBackupHandlers() {
 
     await db.delete(taskTags);
     await db.delete(tags);
+    await db.delete(savedFilters);
     await db.delete(reminders);
     await db.delete(pomodoroSessions);
     await db.delete(tasks);
@@ -83,6 +87,7 @@ export function registerBackupHandlers() {
     if (backup.data.settings?.length) await db.insert(settings).values(backup.data.settings);
     if (backup.data.tags?.length) await db.insert(tags).values(backup.data.tags);
     if (backup.data.taskTags?.length) await db.insert(taskTags).values(backup.data.taskTags);
+    if (backup.data.savedFilters?.length) await db.insert(savedFilters).values(backup.data.savedFilters);
 
     return { cancelled: false, filePath: result.filePaths[0] };
   });
@@ -93,6 +98,25 @@ export function registerBackupHandlers() {
       properties: ['openFile', 'multiSelections'],
     });
 
-    return result.canceled ? [] : result.filePaths;
+    if (result.canceled) {
+      return [];
+    }
+
+    const attachmentDir = path.join(app.getPath('userData'), 'attachments');
+    fs.mkdirSync(attachmentDir, { recursive: true });
+
+    return result.filePaths.map((sourcePath) => {
+      const ext = path.extname(sourcePath);
+      const originalName = path.basename(sourcePath);
+      const storedPath = path.join(attachmentDir, `${randomUUID()}${ext}`);
+      fs.copyFileSync(sourcePath, storedPath);
+
+      return {
+        originalName,
+        storedPath,
+        sourcePath,
+        size: fs.statSync(storedPath).size,
+      };
+    });
   });
 }

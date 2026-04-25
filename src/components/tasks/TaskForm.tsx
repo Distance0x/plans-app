@@ -39,6 +39,18 @@ function parseAttachments(value?: string | null) {
   }
 }
 
+function getAttachmentName(value: any) {
+  if (typeof value === 'string') {
+    return value.split(/[\\/]/).pop() || value;
+  }
+
+  return value?.originalName || value?.storedPath?.split(/[\\/]/).pop() || '附件';
+}
+
+function getAttachmentKey(value: any) {
+  return typeof value === 'string' ? value : value?.storedPath || value?.sourcePath || value?.originalName;
+}
+
 const reminderOffsetOptions = [
   { value: 0, label: '准时' },
   { value: 5, label: '提前 5 分钟' },
@@ -475,7 +487,7 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
 
                   setFormData({
                     ...formData,
-                    attachments: Array.from(new Set([...formData.attachments, ...selected])),
+                    attachments: [...formData.attachments, ...selected],
                   });
                 }}
               >
@@ -487,18 +499,18 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
               <div className="space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
                 {formData.attachments.map((filePath) => (
                   <div
-                    key={filePath}
+                    key={getAttachmentKey(filePath)}
                     className="flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-300"
                   >
-                    <span className="min-w-0 flex-1 truncate" title={filePath}>
-                      {filePath}
+                    <span className="min-w-0 flex-1 truncate" title={typeof filePath === 'string' ? filePath : filePath?.storedPath}>
+                      {getAttachmentName(filePath)}
                     </span>
                     <button
                       type="button"
                       onClick={() =>
                         setFormData({
                           ...formData,
-                          attachments: formData.attachments.filter((item) => item !== filePath),
+                          attachments: formData.attachments.filter((item) => getAttachmentKey(item) !== getAttachmentKey(filePath)),
                         })
                       }
                       className="text-gray-400 hover:text-red-500"

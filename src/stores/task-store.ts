@@ -31,14 +31,23 @@ export interface Task {
   recurrenceParentId?: string | null;
   recurrenceCount?: number;
   tags?: Tag[];
+  reminderCount?: number;
+  hasReminder?: boolean;
 }
 
 export interface TaskInput extends Omit<Partial<Task>, 'attachments'> {
-  attachments?: string[] | string | null;
+  attachments?: Array<string | AttachmentInput> | string | null;
   reminderAt?: string;
   reminderOffsets?: number[];
   reminderChannel?: 'notification' | 'sound' | 'both';
   tagIds?: string[];
+}
+
+export interface AttachmentInput {
+  originalName: string;
+  storedPath: string;
+  sourcePath?: string;
+  size?: number;
 }
 
 export interface TaskList {
@@ -58,10 +67,19 @@ export interface Tag {
   createdAt: string;
 }
 
+export interface SavedFilter {
+  id: string;
+  name: string;
+  rules: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface TaskStore {
   tasks: Task[];
   lists: TaskList[];
   tags: Tag[];
+  savedFilters: SavedFilter[];
   loading: boolean;
   error: string | null;
   focusedTaskId: string | null;
@@ -74,6 +92,9 @@ interface TaskStore {
   deleteList: (id: string) => Promise<boolean>;
   fetchTags: () => Promise<void>;
   createTag: (data: Partial<Tag>) => Promise<Tag | null>;
+  fetchSavedFilters: () => Promise<void>;
+  createSavedFilter: (data: { name: string; rules: Record<string, unknown> }) => Promise<SavedFilter | null>;
+  deleteSavedFilter: (id: string) => Promise<void>;
   setTaskTags: (taskId: string, tagIds: string[]) => Promise<void>;
   createTask: (data: TaskInput) => Promise<Task | null>;
   updateTask: (id: string, updates: TaskInput) => Promise<Task | null>;
@@ -86,6 +107,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   lists: [],
   tags: [],
+  savedFilters: [],
   loading: false,
   error: null,
   focusedTaskId: null,
@@ -162,6 +184,46 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     } catch (error: any) {
       set({ error: error.message });
       return null;
+    }
+  },
+
+  fetchSavedFilters: async () => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      const savedFilters = await window.electron.savedFilter.list();
+      set({ savedFilters });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
+  },
+
+  createSavedFilter: async (data) => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      const savedFilter = await window.electron.savedFilter.create(data);
+      set((state) => ({ savedFilters: [...state.savedFilters, savedFilter] }));
+      return savedFilter;
+    } catch (error: any) {
+      set({ error: error.message });
+      return null;
+    }
+  },
+
+  deleteSavedFilter: async (id) => {
+    try {
+      if (!window.electron) {
+        throw new Error('Electron API not available');
+      }
+      await window.electron.savedFilter.delete(id);
+      set((state) => ({
+        savedFilters: state.savedFilters.filter((filter) => filter.id !== id),
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
     }
   },
 
@@ -312,6 +374,10 @@ if (window.electron) {
 
   window.electron.on('tags:changed', () => {
     void useTaskStore.getState().fetchTags();
+  });
+
+  window.electron.on('saved-filters:changed', () => {
+    void useTaskStore.getState().fetchSavedFilters();
   });
 }
 

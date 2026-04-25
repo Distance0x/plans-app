@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('tag:set-task-tags', taskId, tagIds),
   },
 
+  savedFilter: {
+    list: () => ipcRenderer.invoke('saved-filter:list'),
+    create: (data: any) => ipcRenderer.invoke('saved-filter:create', data),
+    update: (id: string, updates: any) =>
+      ipcRenderer.invoke('saved-filter:update', id, updates),
+    delete: (id: string) => ipcRenderer.invoke('saved-filter:delete', id),
+  },
+
   // 番茄钟相关 API
   timer: {
     start: (taskId?: string) => ipcRenderer.invoke('timer:start', taskId),

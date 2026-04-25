@@ -19,6 +19,12 @@ export interface ElectronAPI {
     delete: (id: string) => Promise<void>;
     setTaskTags: (taskId: string, tagIds: string[]) => Promise<string[]>;
   };
+  savedFilter: {
+    list: () => Promise<any[]>;
+    create: (data: any) => Promise<any>;
+    update: (id: string, updates: any) => Promise<any>;
+    delete: (id: string) => Promise<void>;
+  };
   timer: {
     start: (taskId?: string) => Promise<any>;
     pause: () => Promise<any>;
@@ -59,7 +65,12 @@ export interface ElectronAPI {
     setAlwaysOnTop: (enabled: boolean) => Promise<void>;
   };
   file: {
-    selectAttachments: () => Promise<string[]>;
+    selectAttachments: () => Promise<Array<{
+      originalName: string;
+      storedPath: string;
+      sourcePath: string;
+      size: number;
+    }>>;
   };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;

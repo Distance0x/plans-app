@@ -126,6 +126,14 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       PRIMARY KEY (task_id, tag_id)
     );
 
+    CREATE TABLE IF NOT EXISTS saved_filters (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      rules TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
@@ -134,6 +142,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_reminders_state_trigger ON reminders(state, trigger_at);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_task_id ON pomodoro_sessions(task_id);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_start_time ON pomodoro_sessions(start_time);
+    CREATE INDEX IF NOT EXISTS idx_saved_filters_name ON saved_filters(name);
   `);
 
   ensureColumn(sqlDb, 'tasks', 'duration', 'INTEGER DEFAULT 60');

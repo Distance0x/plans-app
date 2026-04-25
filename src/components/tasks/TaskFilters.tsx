@@ -9,27 +9,31 @@ interface TaskFiltersProps {
   onSearch: (query: string) => void;
   onFilterChange: (filters: any) => void;
   autoFocusSearch?: boolean;
+  onSaveFilter?: (name: string, filters: any) => Promise<void>;
 }
 
-export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false }: TaskFiltersProps) {
+export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false, onSaveFilter }: TaskFiltersProps) {
   const { lists, tags } = useTaskStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [savedFilterName, setSavedFilterName] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
     dueDate: '',
+    dueStart: '',
+    dueEnd: '',
     listId: '',
     tagId: '',
+    hasReminder: '',
+    isRecurring: '',
   });
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    if (value.trim()) {
-      onSearch(value);
-    } else {
-      onFilterChange(filters);
-    }
+    const nextFilters = { ...filters, searchQuery: value.trim() };
+    if (value.trim()) onSearch(value);
+    onFilterChange(cleanFilterObject(nextFilters));
   };
 
   const handleFilterChange = (key: string, value: string) => {
@@ -37,19 +41,28 @@ export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false 
     setFilters(newFilters);
 
     // 移除空值
-    const cleanFilters = Object.fromEntries(
-      Object.entries(newFilters).filter(([_, v]) => v !== '')
-    );
-    onFilterChange(cleanFilters);
+    onFilterChange(cleanFilterObject({ ...newFilters, searchQuery }));
   };
 
   const clearFilters = () => {
-    setFilters({ status: '', priority: '', dueDate: '', listId: '', tagId: '' });
+    setFilters({
+      status: '',
+      priority: '',
+      dueDate: '',
+      dueStart: '',
+      dueEnd: '',
+      listId: '',
+      tagId: '',
+      hasReminder: '',
+      isRecurring: '',
+    });
     setSearchQuery('');
+    setSavedFilterName('');
     onFilterChange({});
   };
 
   const hasActiveFilters = Object.values(filters).some(v => v !== '') || searchQuery !== '';
+  const currentFilterRules = cleanFilterObject({ ...filters, searchQuery });
 
   return (
     <div className="space-y-3">
@@ -110,6 +123,18 @@ export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false 
               value={filters.dueDate}
               onChange={(e) => handleFilterChange('dueDate', e.target.value)}
             />
+            <Input
+              label="开始日期"
+              type="date"
+              value={filters.dueStart}
+              onChange={(e) => handleFilterChange('dueStart', e.target.value)}
+            />
+            <Input
+              label="结束日期"
+              type="date"
+              value={filters.dueEnd}
+              onChange={(e) => handleFilterChange('dueEnd', e.target.value)}
+            />
             <Select
               label="清单"
               value={filters.listId}
@@ -128,9 +153,55 @@ export function TaskFilters({ onSearch, onFilterChange, autoFocusSearch = false 
                 ...tags.map((tag) => ({ value: tag.id, label: `#${tag.name}` })),
               ]}
             />
+            <Select
+              label="提醒"
+              value={filters.hasReminder}
+              onChange={(e) => handleFilterChange('hasReminder', e.target.value)}
+              options={[
+                { value: '', label: '全部' },
+                { value: 'true', label: '有提醒' },
+              ]}
+            />
+            <Select
+              label="重复"
+              value={filters.isRecurring}
+              onChange={(e) => handleFilterChange('isRecurring', e.target.value)}
+              options={[
+                { value: '', label: '全部' },
+                { value: 'true', label: '重复任务' },
+              ]}
+            />
           </div>
+          {onSaveFilter && hasActiveFilters && (
+            <div className="mt-4 flex gap-2 border-t border-gray-200/70 pt-4 dark:border-gray-700/70">
+              <Input
+                placeholder="保存为智能清单名称"
+                value={savedFilterName}
+                onChange={(event) => setSavedFilterName(event.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const name = savedFilterName.trim();
+                  if (!name) return;
+
+                  await onSaveFilter(name, currentFilterRules);
+                  setSavedFilterName('');
+                }}
+              >
+                保存过滤器
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function cleanFilterObject(filters: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== '' && value !== undefined && value !== null)
   );
 }

@@ -26,8 +26,9 @@ import { useTimerStore } from './stores/timer-store';
 import { useSettingsStore, type ThemeMode } from './stores/settings-store';
 import { useEffect } from 'react';
 import { cn } from './lib/utils';
+import type { Task } from './stores/task-store';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag' | 'saved-filter';
 
 interface SidebarGroup {
   id: string;
@@ -39,7 +40,20 @@ interface SidebarGroup {
 }
 
 function App() {
-  const { tasks, lists, tags, fetchTasks, fetchLists, fetchTags, createList, deleteList, setFocusedTask } = useTaskStore();
+  const {
+    tasks,
+    lists,
+    tags,
+    savedFilters,
+    fetchTasks,
+    fetchLists,
+    fetchTags,
+    fetchSavedFilters,
+    createList,
+    deleteList,
+    deleteSavedFilter,
+    setFocusedTask,
+  } = useTaskStore();
   const { start } = useTimerStore();
   const { theme, loadSettings, updateSettings } = useSettingsStore();
   const [currentView, setCurrentView] = useState<ViewType>('today');
@@ -47,6 +61,7 @@ function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedListId, setSelectedListId] = useState<string>('inbox');
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const [selectedSavedFilterId, setSelectedSavedFilterId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
   const [listPendingDelete, setListPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [listDeleteError, setListDeleteError] = useState('');
@@ -64,8 +79,9 @@ function App() {
     fetchTasks();
     fetchLists();
     fetchTags();
+    fetchSavedFilters();
     loadSettings();
-  }, [fetchLists, fetchTags, fetchTasks, loadSettings]);
+  }, [fetchLists, fetchSavedFilters, fetchTags, fetchTasks, loadSettings]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -218,6 +234,10 @@ function App() {
       return tasks.filter((task) => (task.listId || 'inbox') === selectedListId);
     } else if (currentView === 'tag' && selectedTagId) {
       return tasks.filter((task) => task.tags?.some((tag) => tag.id === selectedTagId));
+    } else if (currentView === 'saved-filter' && selectedSavedFilterId) {
+      const savedFilter = savedFilters.find((filter) => filter.id === selectedSavedFilterId);
+      const rules = parseFilterRules(savedFilter?.rules);
+      return tasks.filter((task) => matchesFilterRules(task, rules));
     }
     return tasks;
   };
@@ -226,6 +246,7 @@ function App() {
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) || filteredTasks[0] || null;
   const selectedList = activeLists.find((list) => list.id === selectedListId);
   const selectedTag = tags.find((tag) => tag.id === selectedTagId);
+  const selectedSavedFilter = savedFilters.find((filter) => filter.id === selectedSavedFilterId);
   const taskListTitle =
     currentView === 'search'
       ? '搜索任务'
@@ -233,6 +254,8 @@ function App() {
         ? selectedList?.name || '清单'
         : currentView === 'tag'
           ? `#${selectedTag?.name || '标签'}`
+          : currentView === 'saved-filter'
+            ? selectedSavedFilter?.name || '智能清单'
           : currentView === 'recent'
             ? '最近7天'
             : currentView === 'inbox'
@@ -567,10 +590,11 @@ function App() {
                   >
                     <button
                       onClick={() => {
-                        setCurrentView('list');
-                        setSelectedListId(list.id);
-                        setSelectedTagId(null);
-                        setSelectedGroup(null);
+                      setCurrentView('list');
+                      setSelectedListId(list.id);
+                      setSelectedTagId(null);
+                      setSelectedSavedFilterId(null);
+                      setSelectedGroup(null);
                       }}
                       className="flex min-w-0 flex-1 items-center justify-between px-4 py-2.5"
                     >
@@ -646,6 +670,7 @@ function App() {
                     onClick={() => {
                       setCurrentView('tag');
                       setSelectedTagId(tag.id);
+                      setSelectedSavedFilterId(null);
                       setSelectedGroup(null);
                     }}
                     className={cn(
@@ -658,6 +683,63 @@ function App() {
                     #{tag.name}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {savedFilters.length > 0 && (
+            <div className="space-y-2">
+              <div className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                智能清单
+              </div>
+              <div className="space-y-1">
+                {savedFilters.map((filter) => {
+                  const rules = parseFilterRules(filter.rules);
+                  const count = tasks.filter((task) => matchesFilterRules(task, rules)).length;
+                  return (
+                    <div
+                      key={filter.id}
+                      className={cn(
+                        'group flex items-center gap-1 rounded-xl transition-all text-sm hover-lift',
+                        currentView === 'saved-filter' && selectedSavedFilterId === filter.id
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
+                          : 'hover:bg-gray-100/70 dark:hover:bg-gray-700/40 text-gray-700 dark:text-gray-300'
+                      )}
+                    >
+                      <button
+                        onClick={() => {
+                          setCurrentView('saved-filter');
+                          setSelectedSavedFilterId(filter.id);
+                          setSelectedGroup(null);
+                        }}
+                        className="flex min-w-0 flex-1 items-center justify-between px-4 py-2.5"
+                      >
+                        <span className="truncate">🔎 {filter.name}</span>
+                        <span className="text-xs text-gray-500">{count}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async (event) => {
+                          event.stopPropagation();
+                          await deleteSavedFilter(filter.id);
+                          if (selectedSavedFilterId === filter.id) {
+                            setSelectedSavedFilterId(null);
+                            setCurrentView('today');
+                          }
+                        }}
+                        className={cn(
+                          'mr-2 rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100',
+                          currentView === 'saved-filter' && selectedSavedFilterId === filter.id
+                            ? 'text-white/80 hover:bg-white/20'
+                            : 'text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30'
+                        )}
+                        title="删除智能清单"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -794,6 +876,7 @@ function App() {
                       {currentView === 'search' && '🔍 搜索'}
                       {currentView === 'list' && `📁 ${selectedList?.name || '清单'}`}
                       {currentView === 'tag' && `# ${selectedTag?.name || '标签'}`}
+                      {currentView === 'saved-filter' && `🔎 ${selectedSavedFilter?.name || '智能清单'}`}
                       {selectedGroup === 'pending' && '🔥 待处理'}
                       {selectedGroup === 'in-progress' && '⚡ 处理中'}
                       {selectedGroup === 'completed' && '✅ 已完成'}
@@ -924,6 +1007,44 @@ function App() {
       )}
     </div>
   );
+}
+
+function parseFilterRules(value?: string | null) {
+  if (!value) return {};
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function matchesFilterRules(task: Task, rules: Record<string, any>) {
+  if (rules.status && task.status !== rules.status) return false;
+  if (rules.priority && task.priority !== rules.priority) return false;
+  if (rules.dueDate && task.dueDate !== rules.dueDate) return false;
+  if (rules.dueStart && (!task.dueDate || task.dueDate < rules.dueStart)) return false;
+  if (rules.dueEnd && (!task.dueDate || task.dueDate > rules.dueEnd)) return false;
+  if (rules.listId && (task.listId || 'inbox') !== rules.listId) return false;
+  if (rules.tagId && !task.tags?.some((tag) => tag.id === rules.tagId)) return false;
+  if (rules.hasReminder && !task.hasReminder) return false;
+  if (rules.isRecurring && !task.recurrenceRule) return false;
+
+  if (rules.searchQuery) {
+    const query = String(rules.searchQuery).toLowerCase();
+    const haystack = [
+      task.title,
+      task.description,
+      task.notes,
+      ...(task.tags || []).map((tag) => tag.name),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+
+  return true;
 }
 
 export default App;

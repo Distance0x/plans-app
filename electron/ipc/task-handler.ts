@@ -43,7 +43,13 @@ async function enrichTasksWithTags(db: Awaited<ReturnType<typeof getDatabase>>, 
   const allTags = await db.select().from(tags);
   const tagMap = new Map(allTags.map((tag) => [tag.id, tag]));
   const allTaskTags = await db.select().from(taskTags);
+  const pendingReminders = await db.select().from(reminders).where(eq(reminders.state, 'pending'));
+  const reminderCountByTask = new Map<string, number>();
   const tagsByTask = new Map<string, any[]>();
+
+  for (const reminder of pendingReminders) {
+    reminderCountByTask.set(reminder.taskId, (reminderCountByTask.get(reminder.taskId) || 0) + 1);
+  }
 
   for (const relation of allTaskTags) {
     const tag = tagMap.get(relation.tagId);
@@ -57,6 +63,8 @@ async function enrichTasksWithTags(db: Awaited<ReturnType<typeof getDatabase>>, 
   return taskRows.map((task) => ({
     ...task,
     tags: tagsByTask.get(task.id) || [],
+    reminderCount: reminderCountByTask.get(task.id) || 0,
+    hasReminder: reminderCountByTask.has(task.id),
   }));
 }
 
@@ -256,6 +264,55 @@ export function registerTaskHandlers() {
       const relations = await db.select().from(taskTags).where(eq(taskTags.tagId, filters.tagId));
       const taskIds = new Set(relations.map((relation) => relation.taskId));
       result = result.filter((task) => taskIds.has(task.id));
+    }
+
+    if (filters.searchQuery) {
+      const normalizedQuery = String(filters.searchQuery).trim().toLowerCase();
+      if (normalizedQuery) {
+        const allTags = await db.select().from(tags);
+        const tagMap = new Map(allTags.map((tag) => [tag.id, tag.name.toLowerCase()]));
+        const allTaskTags = await db.select().from(taskTags);
+        const tagNamesByTask = new Map<string, string[]>();
+
+        for (const relation of allTaskTags) {
+          const tagName = tagMap.get(relation.tagId);
+          if (!tagName) continue;
+          const current = tagNamesByTask.get(relation.taskId) || [];
+          current.push(tagName);
+          tagNamesByTask.set(relation.taskId, current);
+        }
+
+        result = result.filter((task) => {
+          const haystack = [
+            task.title,
+            task.description,
+            task.notes,
+            ...(tagNamesByTask.get(task.id) || []),
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(normalizedQuery);
+        });
+      }
+    }
+
+    if (filters.dueStart) {
+      result = result.filter((task) => task.dueDate && task.dueDate >= filters.dueStart);
+    }
+
+    if (filters.dueEnd) {
+      result = result.filter((task) => task.dueDate && task.dueDate <= filters.dueEnd);
+    }
+
+    if (filters.hasReminder) {
+      const pendingReminders = await db.select().from(reminders).where(eq(reminders.state, 'pending'));
+      const taskIds = new Set(pendingReminders.map((reminder) => reminder.taskId));
+      result = result.filter((task) => taskIds.has(task.id));
+    }
+
+    if (filters.isRecurring) {
+      result = result.filter((task) => Boolean(task.recurrenceRule));
     }
 
     return await enrichTasksWithTags(db, result);

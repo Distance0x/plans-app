@@ -62,7 +62,7 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
   const [dueTime, setDueTime] = useState('');
   const [duration, setDuration] = useState('60');
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<any[]>([]);
   const [openPanel, setOpenPanel] = useState<'date' | 'priority' | null>(null);
   const [datePanelMode, setDatePanelMode] = useState<DatePanelMode>('date');
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -173,7 +173,7 @@ export function QuickAddTask({ defaultToNow = false, defaultListId = 'inbox' }: 
           onClick={async () => {
             const selected = await window.electron.file.selectAttachments();
             if (selected.length > 0) {
-              setAttachments(Array.from(new Set([...attachments, ...selected])));
+              setAttachments([...attachments, ...selected]);
             }
           }}
           className={cn(

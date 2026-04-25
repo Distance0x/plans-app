@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { getDatabase } from '../database/db';
-import { lists, tags, taskTags, tasks } from '../database/schema';
+import { lists, savedFilters, tags, taskTags, tasks } from '../database/schema';
 import { broadcastToWindows } from '../utils/window-broadcast';
 
 const DEFAULT_LIST_ID = 'inbox';
@@ -141,5 +141,53 @@ export function registerOrganizationHandlers() {
 
     broadcastToWindows('tasks:changed');
     return uniqueTagIds;
+  });
+
+  ipcMain.handle('saved-filter:list', async () => {
+    const db = await getDatabase();
+    return await db.select().from(savedFilters);
+  });
+
+  ipcMain.handle('saved-filter:create', async (_, data) => {
+    const db = await getDatabase();
+    const name = normalizeName(data?.name);
+
+    if (!name) {
+      throw new Error('Filter name is required');
+    }
+
+    const now = new Date().toISOString();
+    const filter = {
+      id: randomUUID(),
+      name,
+      rules: JSON.stringify(data?.rules || {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await db.insert(savedFilters).values(filter);
+    broadcastToWindows('saved-filters:changed');
+    return filter;
+  });
+
+  ipcMain.handle('saved-filter:update', async (_, id, updates) => {
+    const db = await getDatabase();
+    const updateData: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if ('name' in updates) updateData.name = normalizeName(updates.name);
+    if ('rules' in updates) updateData.rules = JSON.stringify(updates.rules || {});
+
+    await db.update(savedFilters).set(updateData).where(eq(savedFilters.id, id));
+    const [updated] = await db.select().from(savedFilters).where(eq(savedFilters.id, id));
+    broadcastToWindows('saved-filters:changed');
+    return updated;
+  });
+
+  ipcMain.handle('saved-filter:delete', async (_, id) => {
+    const db = await getDatabase();
+    await db.delete(savedFilters).where(eq(savedFilters.id, id));
+    broadcastToWindows('saved-filters:changed');
   });
 }
