@@ -16,6 +16,12 @@ type FloatingMode = 'day' | 'week' | 'pomodoro';
 
 app.setAppUserModelId('com.plans.app');
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
 function loadAppWindow(window: BrowserWindow, hash = '') {
   if (process.env.NODE_ENV === 'development') {
     window.loadURL(`http://localhost:5173${hash}`);
@@ -61,6 +67,11 @@ function createFloatingWindow(mode: FloatingMode = 'day') {
 }
 
 function createWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    restoreMainWindow();
+    return mainWindow;
+  }
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -93,7 +104,27 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  return mainWindow;
 }
+
+function restoreMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+app.on('second-instance', () => {
+  restoreMainWindow();
+});
 
 app.whenReady().then(async () => {
   // 注册 IPC 处理器
@@ -137,10 +168,7 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.handle('floating:show-main', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    restoreMainWindow();
   });
 
   createWindow();

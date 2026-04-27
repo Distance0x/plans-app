@@ -4,19 +4,21 @@ let tray: Tray | null = null;
 
 type FloatingMode = 'day' | 'week' | 'pomodoro';
 
+function createTrayIcon() {
+  // Windows tray rendering is unreliable with SVG data URLs in packaged apps.
+  // Use a PNG buffer so the notification area always gets an opaque icon.
+  const pngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAFmSURBVFhHYxgFMKCc/NpBNfl1A70wyD6o1RAAlfhPR9wAtRoCQAJoCmiNRx0wQhwQ2voeqzgQ09YBDuXv/t99/uc/CHz8+u+/VdFbdDW0cwDIsievIZbDQM+aL+jqaOMA49w3/689+g21FgFiuj6gq6W+A3Qy3vw/ePkn1EoEWHvkOzb11HfA7nOYloPEsKkFYuIdAAo+kO+wycHwsv3foVYiwIkbv/DpI+wAkGbklJzc/xFFHoYnbfwKVoMMQOkAlB6wqYdiwg7InPIRahwE/PiF6Yi6xZ+hsggAygFYsh06JuwAkCEgS5EBsiPQHQgCoJAClQHoZmHBxKWB8nmYPgQ5AhTs6I4DWe7XgLPkQ8fEJ0JsjkAH2KKHACbeASBMyBEFMz9h1YcHk+YAEMblCFBCxKaeACbdASCM7ghQWsCmjghMngNAGBTXIIuxlO+kYPIdQCU86oBRBwwyBwx433BgAAMDAEY5Zh/xYHuHAAAAAElFTkSuQmCC';
+  const icon = nativeImage.createFromBuffer(Buffer.from(pngBase64, 'base64'));
+  icon.setTemplateImage(false);
+  return icon.resize({ width: 16, height: 16 });
+}
+
 export function createAppTray(
   mainWindow: BrowserWindow,
   openFloating?: (mode: FloatingMode) => BrowserWindow
 ) {
-  const icon = nativeImage.createFromDataURL(
-    'data:image/svg+xml;utf8,' +
-      encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-          <rect width="32" height="32" rx="7" fill="#2563eb"/>
-          <path d="M9 16.5l4 4L23 10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      `)
-  );
+  const icon = createTrayIcon();
   tray = new Tray(icon);
   tray.setToolTip('Plans App');
 

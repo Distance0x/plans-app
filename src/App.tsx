@@ -403,14 +403,14 @@ function App() {
       </div>
 
       {/* 最左侧图标栏 */}
-      <div className="w-16 gradient-primary shadow-lg flex flex-col items-center py-4 space-y-4">
+      <div className="w-16 bg-gradient-to-b from-blue-600 via-blue-500 to-indigo-600 shadow-lg flex flex-col items-center py-4 space-y-4">
         <button
           onClick={() => setCurrentView('today')}
           className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             !['calendar', 'pomodoro', 'stats', 'search'].includes(currentView)
-              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
+              ? 'bg-white text-blue-600 shadow-lg backdrop-blur-sm'
+              : 'text-white/80 hover:bg-white/20 hover:text-white'
           )}
           title="任务"
         >
@@ -422,8 +422,8 @@ function App() {
           className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             currentView === 'calendar'
-              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
+              ? 'bg-white text-blue-600 shadow-lg backdrop-blur-sm'
+              : 'text-white/80 hover:bg-white/20 hover:text-white'
           )}
           title="日历"
         >
@@ -435,8 +435,8 @@ function App() {
           className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
             currentView === 'pomodoro'
-              ? 'bg-white/30 text-white shadow-lg backdrop-blur-sm'
-              : 'text-white/50 hover:bg-white/20 hover:text-white/80'
+              ? 'bg-white text-blue-600 shadow-lg backdrop-blur-sm'
+              : 'text-white/80 hover:bg-white/20 hover:text-white'
           )}
           title="番茄钟"
         >
@@ -476,7 +476,12 @@ function App() {
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <group.icon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                  <group.icon className={cn(
+                    'w-5 h-5',
+                    currentView === group.id && !selectedGroup
+                      ? 'text-white'
+                      : 'text-gray-500 dark:text-gray-400'
+                  )} />
                   {editingSidebarId === group.id ? (
                     <input
                       autoFocus
