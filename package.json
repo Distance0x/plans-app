@@ -20,6 +20,12 @@
   ],
   "author": "",
   "license": "MIT",
+  "build": {
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
   "dependencies": {
     "@types/node-cron": "^3.0.11",
     "clsx": "^2.0.0",
