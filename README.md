@@ -1,162 +1,163 @@
-# Plans App
+# plans-app
 
-番茄钟 + 任务管理 + 日历视图的桌面应用
+一个本地优先的 Windows 桌面计划应用，面向个人任务管理、日历时间块和番茄专注。
+
+## 主要功能
+
+- 任务管理：创建、编辑、删除、完成任务，支持优先级、状态、日期、时间和持续时长。
+- 清单系统：收集箱、自定义清单、清单删除与任务归档。
+- 日历视图：月视图、周视图、日视图，支持任务拖动调整日期和时间块。
+- 浮窗模式：今日浮窗、周视图浮窗、番茄钟浮窗，适合桌面常驻查看。
+- 番茄钟：工作/短休息/长休息计时，支持专注统计。
+- 提醒与重复：本地提醒、重复规则、通知操作。
+- 任务详情：状态、优先级、日期时间、清单、Markdown 笔记。
+- 搜索与过滤：任务搜索、状态/优先级/日期过滤。
+- 本地存储：使用 SQLite/sql.js，本地保存数据，不依赖服务器。
 
 ## 技术栈
 
-- **前端**: React 18 + TypeScript + Tailwind CSS
-- **桌面**: Electron 28
-- **数据库**: sql.js (SQLite)
-- **状态管理**: Zustand
-- **构建工具**: Vite 5
+- React 18
+- TypeScript
+- Vite
+- Electron 28
+- Tailwind CSS
+- Zustand
+- Drizzle ORM
+- sql.js
+- electron-builder
 
-## 已完成功能
+## 安装使用
 
-### ✅ 阶段 1：项目基础搭建
-- Electron + React + Vite 项目初始化
-- TypeScript 严格模式配置
-- Tailwind CSS + Glassmorphism 样式系统
-- IPC 通信基础架构
-- sql.js 数据库层（自动保存）
+Windows 安装包位于：
 
-### ✅ 阶段 2：核心功能 - 每日清单
-- **任务 CRUD**：创建、编辑、删除、完成任务
-- **任务列表 UI**：Glassmorphism 毛玻璃样式
-- **任务表单**：标题、描述、优先级、截止日期
-- **搜索和过滤**：实时搜索、状态/优先级/日期过滤
-- **优先级标识**：高/中/低颜色区分
-- **子任务支持**：最多2层嵌套
-- **Markdown笔记**：Obsidian风格实时预览
-
-### ✅ 阶段 3：番茄钟功能
-- **计时器**：25 分钟工作 + 5 分钟短休息 + 30 分钟长休息
-- **控制按钮**：开始/暂停/恢复/重置/跳过
-- **进度显示**：倒计时 + SVG 进度环动画
-- **会话管理**：自动切换工作/休息模式
-- **统计记录**：保存番茄钟记录到数据库
-- **实时更新**：IPC 事件推送状态
-- **锁屏专注模式**：全屏倒计时，减少干扰
-- **自定义时长**：可调整工作/休息时间
-
-### ✅ 阶段 4：日历视图
-- **月视图**：完整月历，任务卡片显示，拖拽调整日期
-- **周视图**：时间轴显示，动态时间范围，上下拖动调整开始/结束时间
-- **日视图**：详细时间线，拖动调整任务时间和时长
-- **今日高亮**：当前日期特殊标识
-- **任务筛选**：今天/最近7天/收集箱独立筛选逻辑
-
-### ✅ UI/UX 优化
-- **美化界面**：渐变背景、玻璃态效果、动画过渡
-- **响应式布局**：日历/番茄钟全屏显示，隐藏侧边栏
-- **图标优化**：统一灰色调，选中高亮
-- **任务卡片**：圆角、阴影、悬停效果、优先级渐变标签
-
-## 待完成功能
-
-### ⏳ 阶段 5：提醒和重复任务
-- **提醒引擎**：基于 node-cron 的定时提醒
-- **系统通知**：Electron 原生通知 + 声音提示
-- **重复规则**：每天/每周/每月/自定义重复
-- **提醒设置**：提前提醒、多次提醒
-- **快捷操作**：通知中快速完成/延后任务
-
-### ⏳ 阶段 6：打包和优化
-- Windows 安装包
-- 性能优化
-- 错误处理
-- 用户文档
-
-## 项目结构
-
-```
-plans-app/
-├── electron/
-│   ├── main/           # 主进程
-│   ├── preload/        # 预加载脚本
-│   ├── database/       # 数据库层
-│   │   ├── schema.ts   # 数据库表定义
-│   │   ├── db.ts       # 数据库连接
-│   │   └── migrations/ # 迁移脚本
-│   ├── ipc/            # IPC 处理器
-│   │   ├── task-handler.ts   # 任务 CRUD
-│   │   └── timer-handler.ts  # 番茄钟
-│   └── services/       # 后台服务
-│       ├── reminder-engine.ts      # 提醒引擎
-│       ├── recurrence-engine.ts    # 重复任务引擎
-│       └── notification-service.ts # 通知服务
-├── src/
-│   ├── components/
-│   │   ├── tasks/      # 任务组件
-│   │   ├── timer/      # 番茄钟组件
-│   │   ├── calendar/   # 日历组件
-│   │   └── ui/         # 基础 UI 组件
-│   ├── stores/         # Zustand 状态管理
-│   ├── types/          # TypeScript 类型
-│   └── styles/         # 全局样式
-└── dist-electron/      # 编译输出
-
+```text
+dist/plans-app Setup 1.0.0.exe
 ```
 
-## 开发命令
+发布到 GitHub Releases 时，上传这个 `.exe` 安装包即可。如果后续做自动更新，再一起上传 `.blockmap`。
 
-```bash
-# 安装依赖
+当前安装包配置为传统安装向导：
+
+- 支持选择安装目录。
+- 默认安装到当前用户目录。
+- 会创建开始菜单入口。
+- 桌面快捷方式由 NSIS/electron-builder 配置和安装过程决定。
+
+## GitHub Release
+
+推荐发布步骤：
+
+1. 打开 GitHub 仓库的 `Releases` 页面。
+2. 点击 `Draft a new release`。
+3. 创建 tag，例如 `v1.0.0`。
+4. Release title 填 `plans-app v1.0.0`。
+5. 上传文件：
+
+```text
+dist/plans-app Setup 1.0.0.exe
+```
+
+也可以使用 GitHub CLI：
+
+```powershell
+gh release create v1.0.0 "dist\plans-app Setup 1.0.0.exe" --title "plans-app v1.0.0" --notes "Windows installer for plans-app."
+```
+
+## 开发
+
+安装依赖：
+
+```powershell
 npm install
+```
 
-# 启动开发服务器（仅前端）
+启动前端开发服务：
+
+```powershell
 npm run dev
+```
 
-# 编译 Electron 代码
-npm run build:electron
+启动 Electron 开发模式：
 
-# 启动 Electron 应用
+```powershell
 npm run electron:dev
+```
 
-# 同时启动前端和 Electron
+同时启动前端和 Electron：
+
+```powershell
 npm start
+```
 
-# 构建生产版本
+## 构建
+
+构建前端：
+
+```powershell
 npm run build
+```
+
+构建 Electron 主进程：
+
+```powershell
+npm run build:electron
+```
+
+生成 Windows 安装包：
+
+```powershell
 npm run electron:build
 ```
 
-## 数据库表
+构建输出：
 
-### tasks（任务表）
-- id, title, description, notes
-- priority (high/medium/low)
-- status (todo/in_progress/completed)
-- due_date, due_time, duration
-- created_at, updated_at, completed_at
-- parent_id, order_index
-- recurrence_rule, reminder_time
-- attachments
+```text
+dist-renderer/    前端构建产物
+dist-electron/    Electron 主进程构建产物
+dist/             打包后的 Windows 应用和安装包
+```
 
-### pomodoro_sessions（番茄钟记录）
-- id, task_id
-- session_type (work/short_break/long_break)
-- duration, start_time, end_time
-- completed, interrupted
+## 安装目录配置
 
-### settings（设置）
-- key, value, updated_at
+安装包配置在 `package.json` 的 `build.nsis`：
 
-## 当前进度
+```json
+{
+  "build": {
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
+```
 
-**完成度**：80%（4/5 阶段完成）
+这表示安装时会显示安装向导，并允许用户选择安装路径。
 
-**Git 提交**：25+ commits
+## 数据说明
 
-**开发时间**：约 7 天
+应用数据存储在本地用户目录下，不需要服务器。不同机器之间目前不会自动同步。
 
-## 特色功能
+如果后续要做跨设备同步，需要新增账号、服务端数据库、冲突合并和加密策略；当前版本定位为单机本地应用。
 
-- 🎨 **现代化UI**：渐变背景、玻璃态效果、流畅动画
-- 📅 **强大日历**：月/周/日三种视图，拖拽调整时间
-- 🍅 **专注番茄钟**：锁屏模式、自定义时长、进度可视化
-- 📝 **Markdown笔记**：实时预览、待办事项、代码高亮
-- 🔄 **智能筛选**：今天/最近7天/收集箱独立逻辑
-- ⚡ **快速操作**：快捷键、拖拽、双击编辑
+## 项目结构
+
+```text
+plans-app/
+  electron/          Electron 主进程、preload、数据库、IPC 和后台服务
+  src/               React 渲染进程
+  src/components/    UI 组件
+  src/stores/        Zustand 状态管理
+  src/types/         TypeScript 类型
+  docs/              调研、设计和迭代规划文档
+  dist/              打包输出
+```
+
+## 注意事项
+
+- `node_modules/`、`dist/`、`dist-renderer/`、`dist-electron/` 不应提交到 Git。
+- 本地研究报告、测试页面和未授权素材不应提交到 Release。
+- 如果使用第三方角色图片或 Live2D 模型，只能在明确授权范围内使用，避免把未授权素材打包发布。
 
 ## License
 
