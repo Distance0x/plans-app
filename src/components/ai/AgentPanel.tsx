@@ -395,82 +395,68 @@ export function AgentPanel() {
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </div>
                   {msg.draftActions && msg.draftActions.length > 0 && msg.draftActions[0].type === 'create_task' && (
-                    <Card
-                      size="small"
-                      className="mt-2"
-                      title="📋 待创建任务"
-                      extra={
-                        appliedMessages.has(msg.id) ? (
-                          <span className="text-sm text-green-600 font-medium">✓ 已创建</span>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Button
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => {
-                                const tasks = msg.draftActions![0].payload as Array<{
-                                  title: string;
-                                  description?: string;
-                                  priority?: 'high' | 'medium' | 'low';
-                                  dueDate?: string;
-                                  dueTime?: string;
-                                  duration?: number;
-                                }>;
-                                if (tasks.length > 0) {
-                                  setEditingTask(tasks[0]);
-                                }
-                              }}
-                            >
-                              修改
-                            </Button>
-                            <Button
-                              type="primary"
-                              size="small"
-                              onClick={async () => {
-                                if (appliedMessages.has(msg.id)) return;
-                                setAppliedMessages(prev => new Set(prev).add(msg.id));
-                                try {
-                                  const tasks = msg.draftActions![0].payload as Array<{
-                                    title: string;
-                                    description?: string;
-                                    priority?: 'high' | 'medium' | 'low';
-                                    dueDate?: string;
-                                    dueTime?: string;
-                                    duration?: number;
-                                  }>;
-                                  for (const task of tasks) {
-                                    await createTask({
-                                      title: task.title,
-                                      description: task.description,
-                                      priority: task.priority || 'medium',
-                                      dueDate: task.dueDate,
-                                      dueTime: task.dueTime,
-                                      duration: task.duration || 60,
-                                    });
-                                  }
-                                  clearDraft();
-                                } catch (error) {
-                                  setAppliedMessages(prev => {
-                                    const next = new Set(prev);
-                                    next.delete(msg.id);
-                                    return next;
-                                  });
-                                  throw error;
-                                }
-                              }}
-                            >
-                              应用
-                            </Button>
-                          </div>
-                        )
-                      }
-                    >
+                    <div className="mt-2 space-y-2">
                       {((msg.draftActions[0].payload as any[]) || []).map((task: any, idx: number) => (
-                        <div key={idx} className="text-sm py-1">
-                          • {task.title} {task.dueDate && `(${task.dueDate})`}
-                        </div>
+                        <Card
+                          key={idx}
+                          size="small"
+                          title={`📋 任务 ${idx + 1}: ${task.title}`}
+                          extra={
+                            appliedMessages.has(`${msg.id}-${idx}`) ? (
+                              <span className="text-sm text-green-600 font-medium">✓ 已创建</span>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={() => {
+                                    setEditingTask(task);
+                                  }}
+                                >
+                                  修改
+                                </Button>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  onClick={async () => {
+                                    if (appliedMessages.has(`${msg.id}-${idx}`)) return;
+                                    setAppliedMessages(prev => new Set(prev).add(`${msg.id}-${idx}`));
+                                    try {
+                                      await createTask({
+                                        title: task.title,
+                                        description: task.description,
+                                        priority: task.priority || 'medium',
+                                        dueDate: task.dueDate,
+                                        dueTime: task.dueTime,
+                                        duration: task.duration || 60,
+                                      });
+                                    } catch (error) {
+                                      setAppliedMessages(prev => {
+                                        const next = new Set(prev);
+                                        next.delete(`${msg.id}-${idx}`);
+                                        return next;
+                                      });
+                                      throw error;
+                                    }
+                                  }}
+                                >
+                                  应用
+                                </Button>
+                              </div>
+                            )
+                          }
+                        >
+                          <div className="text-sm space-y-1">
+                            {task.description && <div className="text-gray-600 dark:text-gray-400">{task.description}</div>}
+                            <div className="flex gap-2 text-xs text-gray-500">
+                              {task.priority && <span>优先级: {task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}</span>}
+                              {task.dueDate && <span>截止: {task.dueDate} {task.dueTime || ''}</span>}
+                              {task.duration && <span>时长: {task.duration}分钟</span>}
+                            </div>
+                          </div>
+                        </Card>
                       ))}
-                    </Card>
+                    </div>
                   )}
                 </div>
               }
