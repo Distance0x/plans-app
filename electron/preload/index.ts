@@ -109,6 +109,11 @@ contextBridge.exposeInMainWorld('electron', {
     list: () => ipcRenderer.invoke('snapshot:list'),
   },
 
+  recommendation: {
+    get: () => ipcRenderer.invoke('recommendation:get'),
+    profile: () => ipcRenderer.invoke('recommendation:profile'),
+  },
+
   // 事件监听
   on: (channel: string, callback: (...args: any[]) => void) => {
     const wrapped = (_: IpcRendererEvent, ...args: any[]) => callback(...args);

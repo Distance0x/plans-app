@@ -121,6 +121,33 @@ export interface ElectronAPI {
       createdAt: string;
     }>>;
   };
+  recommendation: {
+    get: () => Promise<{
+      success: boolean;
+      recommendations?: Array<{
+        type: 'schedule' | 'break' | 'priority' | 'tag' | 'focus_time';
+        message: string;
+        confidence: number;
+        action?: {
+          type: string;
+          payload: unknown;
+        };
+      }>;
+      error?: string;
+    }>;
+    profile: () => Promise<{
+      success: boolean;
+      profile?: {
+        productiveHours: number[];
+        avgTaskDuration: number;
+        completionRate: number;
+        streakDays: number;
+        frequentTags: Array<{ tagId: string; count: number }>;
+        priorityDistribution: Record<'high' | 'medium' | 'low', number>;
+      };
+      error?: string;
+    }>;
+  };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }
