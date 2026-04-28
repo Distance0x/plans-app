@@ -40,6 +40,8 @@ export function AgentPanel() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [inputValue, setInputValue] = useState('');
+  const [applyingDraft, setApplyingDraft] = useState(false);
+  const [appliedMessages, setAppliedMessages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadConfig();
@@ -378,33 +380,48 @@ export function AgentPanel() {
                       className="mt-2"
                       title="📋 待创建任务"
                       extra={
-                        <Button
-                          type="primary"
-                          size="small"
-                          onClick={async () => {
-                            const tasks = msg.draftActions![0].payload as Array<{
-                              title: string;
-                              description?: string;
-                              priority?: 'high' | 'medium' | 'low';
-                              dueDate?: string;
-                              dueTime?: string;
-                              duration?: number;
-                            }>;
-                            for (const task of tasks) {
-                              await createTask({
-                                title: task.title,
-                                description: task.description,
-                                priority: task.priority || 'medium',
-                                dueDate: task.dueDate,
-                                dueTime: task.dueTime,
-                                duration: task.duration || 60,
-                              });
-                            }
-                            clearDraft();
-                          }}
-                        >
-                          应用
-                        </Button>
+                        appliedMessages.has(msg.id) ? (
+                          <span className="text-sm text-green-600 font-medium">✓ 已创建</span>
+                        ) : (
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={async () => {
+                              if (appliedMessages.has(msg.id)) return;
+                              setAppliedMessages(prev => new Set(prev).add(msg.id));
+                              try {
+                                const tasks = msg.draftActions![0].payload as Array<{
+                                  title: string;
+                                  description?: string;
+                                  priority?: 'high' | 'medium' | 'low';
+                                  dueDate?: string;
+                                  dueTime?: string;
+                                  duration?: number;
+                                }>;
+                                for (const task of tasks) {
+                                  await createTask({
+                                    title: task.title,
+                                    description: task.description,
+                                    priority: task.priority || 'medium',
+                                    dueDate: task.dueDate,
+                                    dueTime: task.dueTime,
+                                    duration: task.duration || 60,
+                                  });
+                                }
+                                clearDraft();
+                              } catch (error) {
+                                setAppliedMessages(prev => {
+                                  const next = new Set(prev);
+                                  next.delete(msg.id);
+                                  return next;
+                                });
+                                throw error;
+                              }
+                            }}
+                          >
+                            应用
+                          </Button>
+                        )
                       }
                     >
                       {((msg.draftActions[0].payload as any[]) || []).map((task: any, idx: number) => (
@@ -495,34 +512,41 @@ export function AgentPanel() {
             <div className="space-x-2">
               <button
                 onClick={async () => {
-                  await window.electron.snapshot.create('ai_agent');
-                  for (const action of draftActions) {
-                    if (action.type === 'create_task') {
-                      const tasks = action.payload as Array<{
-                        title: string;
-                        description?: string;
-                        priority?: 'high' | 'medium' | 'low';
-                        dueDate?: string;
-                        dueTime?: string;
-                        duration?: number;
-                      }>;
-                      for (const task of tasks) {
-                        await createTask({
-                          title: task.title,
-                          description: task.description,
-                          priority: task.priority || 'medium',
-                          dueDate: task.dueDate,
-                          dueTime: task.dueTime,
-                          duration: task.duration || 60,
-                        });
+                  if (applyingDraft) return;
+                  setApplyingDraft(true);
+                  try {
+                    await window.electron.snapshot.create('ai_agent');
+                    for (const action of draftActions) {
+                      if (action.type === 'create_task') {
+                        const tasks = action.payload as Array<{
+                          title: string;
+                          description?: string;
+                          priority?: 'high' | 'medium' | 'low';
+                          dueDate?: string;
+                          dueTime?: string;
+                          duration?: number;
+                        }>;
+                        for (const task of tasks) {
+                          await createTask({
+                            title: task.title,
+                            description: task.description,
+                            priority: task.priority || 'medium',
+                            dueDate: task.dueDate,
+                            dueTime: task.dueTime,
+                            duration: task.duration || 60,
+                          });
+                        }
                       }
                     }
+                    clearDraft();
+                  } finally {
+                    setApplyingDraft(false);
                   }
-                  clearDraft();
                 }}
-                className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium"
+                disabled={applyingDraft}
+                className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ✓ 应用
+                {applyingDraft ? '应用中...' : '✓ 应用'}
               </button>
               <button
                 onClick={clearDraft}
