@@ -11,6 +11,15 @@ interface ChatResponse {
   responseId: string;
   assistantText: string;
   draftActions: DraftAction[];
+  thinking?: string;
+  toolCalls?: ToolCallInfo[];
+}
+
+interface ToolCallInfo {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'pending' | 'completed' | 'failed';
 }
 
 interface DraftAction {
@@ -102,7 +111,10 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
   },
 ];
 
-export async function chatAndPlan(request: ChatRequest): Promise<ChatResponse> {
+export async function chatAndPlan(
+  request: ChatRequest,
+  onStream?: (chunk: { thinking?: string; toolCalls?: ToolCallInfo[]; content?: string }) => void
+): Promise<ChatResponse> {
   const config = loadAIConfig();
   if (!config) {
     throw new Error('AI configuration not set');
@@ -111,12 +123,21 @@ export async function chatAndPlan(request: ChatRequest): Promise<ChatResponse> {
   const client = new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseURL,
+    timeout: 15000,
   });
+
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+  const currentTime = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: 'system',
-      content: '你是一个任务管理助手。帮助用户创建、更新和安排任务。使用提供的工具来操作任务。',
+      content: `你是一个任务管理助手。帮助用户创建、更新和安排任务。使用提供的工具来操作任务。
+
+当前日期时间：${currentDate} ${currentTime}
+
+当用户提到"明天"、"后天"、"下周"等相对时间时，请根据当前日期自动计算具体日期。`,
     },
     {
       role: 'user',
@@ -124,44 +145,153 @@ export async function chatAndPlan(request: ChatRequest): Promise<ChatResponse> {
     },
   ];
 
-  const completion = await client.chat.completions.create({
+  const stream = await client.chat.completions.create({
     model: config.model,
     messages,
     tools,
     tool_choice: 'auto',
+    stream: true,
   });
 
-  const responseMessage = completion.choices[0].message;
+  let assistantText = '';
+  let thinking = '';
+  const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>();
   const draftActions: DraftAction[] = [];
 
-  if (responseMessage.tool_calls) {
-    for (const toolCall of responseMessage.tool_calls) {
-      if (toolCall.type !== 'function') continue;
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta;
+    if (!delta) continue;
 
-      const args = JSON.parse(toolCall.function.arguments);
+    if (delta.content) {
+      assistantText += delta.content;
+      onStream?.({ content: delta.content });
+    }
 
-      if (toolCall.function.name === 'create_tasks') {
+    if (delta.tool_calls) {
+      for (const toolCall of delta.tool_calls) {
+        const index = toolCall.index;
+        const existing = toolCallsMap.get(index);
+
+        if (!existing) {
+          toolCallsMap.set(index, {
+            id: toolCall.id || '',
+            name: toolCall.function?.name || '',
+            arguments: toolCall.function?.arguments || '',
+          });
+        } else {
+          if (toolCall.function?.arguments) {
+            existing.arguments += toolCall.function.arguments;
+          }
+        }
+      }
+
+      const toolCalls: ToolCallInfo[] = Array.from(toolCallsMap.values()).map(tc => ({
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+        status: 'pending' as const,
+      }));
+      onStream?.({ toolCalls });
+    }
+  }
+
+  const completedToolCalls: ToolCallInfo[] = Array.from(toolCallsMap.values()).map(tc => ({
+    id: tc.id,
+    name: tc.name,
+    arguments: tc.arguments,
+    status: 'completed' as const,
+  }));
+
+  for (const toolCall of completedToolCalls) {
+    try {
+      const args = JSON.parse(toolCall.arguments);
+
+      if (toolCall.name === 'create_tasks') {
         draftActions.push({
           type: 'create_task',
           payload: args.tasks,
         });
-      } else if (toolCall.function.name === 'update_tasks') {
+      } else if (toolCall.name === 'update_tasks') {
         draftActions.push({
           type: 'update_task',
           payload: args.updates,
         });
-      } else if (toolCall.function.name === 'schedule_tasks') {
+      } else if (toolCall.name === 'schedule_tasks') {
         draftActions.push({
           type: 'schedule_task',
           payload: args.schedules,
         });
       }
+    } catch (e) {
+      console.error('Failed to parse tool call arguments:', e);
     }
   }
 
   return {
     responseId: randomUUID(),
-    assistantText: responseMessage.content || '已生成任务建议',
+    assistantText: assistantText || '已生成任务建议',
     draftActions,
+    thinking: thinking || undefined,
+    toolCalls: completedToolCalls.length > 0 ? completedToolCalls : undefined,
   };
+}
+
+export async function testConnection(): Promise<void> {
+  const config = loadAIConfig();
+  if (!config) {
+    throw new Error('AI configuration not set');
+  }
+
+  console.log('[AI Test] Config:', {
+    baseURL: config.baseURL,
+    model: config.model,
+    hasApiKey: !!config.apiKey,
+  });
+
+  // Step 1: Test network reachability
+  try {
+    const url = new URL(config.baseURL);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    await fetch(url.origin, {
+      method: 'HEAD',
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+
+    console.log('[AI Test] Network reachable');
+  } catch (error: any) {
+    console.error('[AI Test] Network unreachable:', error.message);
+    throw new Error(`网络不可达: ${error.message}`);
+  }
+
+  // Step 2: Test API with minimal request
+  const client = new OpenAI({
+    apiKey: config.apiKey,
+    baseURL: config.baseURL,
+    timeout: 15000,
+    maxRetries: 0,
+  });
+
+  try {
+    const response = await client.chat.completions.create({
+      model: config.model,
+      messages: [{ role: 'user', content: 'hi' }],
+      max_tokens: 5,
+    });
+    console.log('[AI Test] Success:', response.id);
+  } catch (error: any) {
+    console.error('[AI Test] Failed:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type,
+    });
+
+    if (error.message?.includes('timed out')) {
+      throw new Error('API 响应超时，请检查：1) 网络连接 2) API 服务商状态 3) 是否需要代理');
+    }
+
+    throw new Error(`连接失败: ${error.message || error.code || '未知错误'}`);
+  }
 }

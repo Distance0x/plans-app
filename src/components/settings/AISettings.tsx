@@ -34,7 +34,7 @@ export function AISettings() {
     setMessage('');
 
     try {
-      await window.electron.ai.saveConfig(baseURL, apiKey, model);
+      await window.electron.ai.saveConfig({ baseURL, apiKey, model });
       setMessage('保存成功');
     } catch (error) {
       setMessage(`保存失败: ${error instanceof Error ? error.message : '未知错误'}`);

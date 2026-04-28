@@ -81,8 +81,16 @@ export interface ElectronAPI {
         type: 'create_task' | 'update_task' | 'schedule_task';
         payload: unknown;
       }>;
+      thinking?: string;
+      toolCalls?: Array<{
+        id: string;
+        name: string;
+        arguments: string;
+        status: 'pending' | 'completed' | 'failed';
+      }>;
     }>;
-    saveConfig: (baseURL: string, apiKey: string, model: string) => Promise<{ success: boolean }>;
+    testConnection: () => Promise<{ success: boolean }>;
+    saveConfig: (config: { baseURL: string; apiKey: string; model: string }) => Promise<{ success: boolean }>;
     loadConfig: () => Promise<{
       config: {
         baseURL: string;

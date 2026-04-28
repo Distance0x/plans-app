@@ -24,6 +24,8 @@ export function AgentPanel() {
     addMessage,
     deleteMessage,
     setLoading,
+    setStreamingThinking,
+    setPendingToolCalls,
     setDraftActions,
     clearDraft,
     createSession,
@@ -41,7 +43,22 @@ export function AgentPanel() {
 
   useEffect(() => {
     loadConfig();
-  }, []);
+
+    const handleStream = (chunk: { thinking?: string; toolCalls?: any[]; content?: string }) => {
+      if (chunk.thinking) {
+        setStreamingThinking(chunk.thinking);
+      }
+      if (chunk.toolCalls) {
+        setPendingToolCalls(chunk.toolCalls);
+      }
+    };
+
+    window.electron.on('ai:stream', handleStream);
+
+    return () => {
+      window.electron.off('ai:stream', handleStream);
+    };
+  }, [setStreamingThinking, setPendingToolCalls]);
 
   const loadConfig = async () => {
     try {
@@ -124,6 +141,8 @@ export function AgentPanel() {
     addMessage(userMessage);
     setLoading(true);
     setInputValue('');
+    setStreamingThinking('');
+    setPendingToolCalls([]);
 
     try {
       const response = await window.electron.ai.chat(message);
@@ -131,6 +150,8 @@ export function AgentPanel() {
         id: `msg_${Date.now()}`,
         role: 'assistant',
         content: response.assistantText,
+        thinking: response.thinking,
+        toolCalls: response.toolCalls,
         draftActions: response.draftActions,
         timestamp: Date.now(),
       });
@@ -144,6 +165,8 @@ export function AgentPanel() {
       });
     } finally {
       setLoading(false);
+      setStreamingThinking('');
+      setPendingToolCalls([]);
     }
   };
 

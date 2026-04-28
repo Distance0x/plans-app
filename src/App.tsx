@@ -410,7 +410,7 @@ function App() {
           onClick={() => setCurrentView('today')}
           className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
-            !['calendar', 'pomodoro', 'stats', 'search'].includes(currentView)
+            !['calendar', 'pomodoro', 'stats', 'search', 'ai'].includes(currentView)
               ? 'bg-white text-blue-600 shadow-lg backdrop-blur-sm'
               : 'text-white/80 hover:bg-white/20 hover:text-white'
           )}

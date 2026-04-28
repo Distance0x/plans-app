@@ -1,14 +1,27 @@
-import { ipcMain } from 'electron';
-import { chatAndPlan } from '../services/ai-service';
+import { ipcMain, BrowserWindow } from 'electron';
+import { chatAndPlan, testConnection } from '../services/ai-service';
 import { saveAIConfig, loadAIConfig, deleteAIConfig, getSecretHealth } from '../services/keyvault';
 
 export function registerAIHandlers() {
-  ipcMain.handle('ai:chat', async (_event, userText: string, threadId?: string) => {
-    return chatAndPlan({ userText, threadId });
+  ipcMain.handle('ai:chat', async (event, userText: string, threadId?: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+
+    return chatAndPlan({ userText, threadId }, (chunk) => {
+      win?.webContents.send('ai:stream', chunk);
+    });
   });
 
-  ipcMain.handle('ai:saveConfig', async (_event, baseURL: string, apiKey: string, model: string) => {
-    saveAIConfig({ baseURL, apiKey, model });
+  ipcMain.handle('ai:testConnection', async () => {
+    try {
+      await testConnection();
+      return { success: true };
+    } catch (error: any) {
+      throw new Error(error?.message || String(error));
+    }
+  });
+
+  ipcMain.handle('ai:saveConfig', async (_event, config: { baseURL: string; apiKey: string; model: string }) => {
+    saveAIConfig(config);
     return { success: true };
   });
 
