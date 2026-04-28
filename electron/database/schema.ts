@@ -133,3 +133,48 @@ export const attachments = sqliteTable('attachments', {
   size: integer('size'),
   createdAt: text('created_at').notNull(),
 });
+
+// 用户画像 - 行为习惯统计
+export const userBehaviorStats = sqliteTable('user_behavior_stats', {
+  id: text('id').primaryKey(),
+  date: text('date').notNull(), // YYYY-MM-DD
+  // 任务完成统计
+  tasksCreated: integer('tasks_created').default(0),
+  tasksCompleted: integer('tasks_completed').default(0),
+  completionRate: integer('completion_rate').default(0), // 百分比
+  // 时间分布（JSON: {hour: count}）
+  hourlyDistribution: text('hourly_distribution'),
+  // 优先级分布（JSON: {high: n, medium: n, low: n}）
+  priorityDistribution: text('priority_distribution'),
+  // 番茄钟统计
+  pomodoroCompleted: integer('pomodoro_completed').default(0),
+  focusMinutes: integer('focus_minutes').default(0),
+  // AI 交互统计
+  aiConversations: integer('ai_conversations').default(0),
+  aiTasksGenerated: integer('ai_tasks_generated').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// 用户画像 - 标签偏好
+export const userTagPreferences = sqliteTable('user_tag_preferences', {
+  tagId: text('tag_id').notNull(),
+  usageCount: integer('usage_count').default(0),
+  lastUsedAt: text('last_used_at').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+// 用户画像 - 时间偏好分析
+export const userTimePreferences = sqliteTable('user_time_preferences', {
+  id: text('id').primaryKey(),
+  // 高效时段（JSON: [9, 10, 14, 15]）
+  productiveHours: text('productive_hours'),
+  // 平均任务时长（分钟）
+  avgTaskDuration: integer('avg_task_duration').default(60),
+  // 连续完成天数
+  streakDays: integer('streak_days').default(0),
+  lastStreakDate: text('last_streak_date'),
+  // 周工作模式（JSON: {monday: {start: "09:00", end: "18:00"}, ...}）
+  weeklyPattern: text('weekly_pattern'),
+  updatedAt: text('updated_at').notNull(),
+});

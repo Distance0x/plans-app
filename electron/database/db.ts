@@ -184,6 +184,39 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS user_behavior_stats (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL UNIQUE,
+      tasks_created INTEGER DEFAULT 0,
+      tasks_completed INTEGER DEFAULT 0,
+      completion_rate INTEGER DEFAULT 0,
+      hourly_distribution TEXT,
+      priority_distribution TEXT,
+      pomodoro_completed INTEGER DEFAULT 0,
+      focus_minutes INTEGER DEFAULT 0,
+      ai_conversations INTEGER DEFAULT 0,
+      ai_tasks_generated INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_tag_preferences (
+      tag_id TEXT PRIMARY KEY,
+      usage_count INTEGER DEFAULT 0,
+      last_used_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_time_preferences (
+      id TEXT PRIMARY KEY,
+      productive_hours TEXT,
+      avg_task_duration INTEGER DEFAULT 60,
+      streak_days INTEGER DEFAULT 0,
+      last_streak_date TEXT,
+      weekly_pattern TEXT,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
@@ -193,6 +226,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_pomodoro_start_time ON pomodoro_sessions(start_time);
     CREATE INDEX IF NOT EXISTS idx_saved_filters_name ON saved_filters(name);
     CREATE INDEX IF NOT EXISTS idx_ai_threads_session_id ON ai_threads(session_id);
+    CREATE INDEX IF NOT EXISTS idx_behavior_stats_date ON user_behavior_stats(date);
   `);
 
   ensureColumn(sqlDb, 'tasks', 'duration', 'INTEGER DEFAULT 60');
