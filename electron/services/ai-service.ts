@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { loadAIConfig } from './keyvault';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 interface ChatRequest {
   userText: string;
@@ -160,7 +160,7 @@ export async function chatAndPlan(request: ChatRequest): Promise<ChatResponse> {
   }
 
   return {
-    responseId: uuidv4(),
+    responseId: randomUUID(),
     assistantText: responseMessage.content || '已生成任务建议',
     draftActions,
   };

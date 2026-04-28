@@ -15,13 +15,15 @@ import {
   Minimize2,
   Maximize2,
   X,
-  ExternalLink
+  ExternalLink,
+  Bot
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
 import { TaskDetailPanel } from './components/tasks/TaskDetailPanel';
 import { PomodoroTimer } from './components/timer/PomodoroTimer';
 import { FocusStats } from './components/timer/FocusStats';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
+import { AgentPanel } from './components/ai/AgentPanel';
 // import { MascotWidget } from './components/mascot';
 import { useTaskStore } from './stores/task-store';
 import { useTimerStore } from './stores/timer-store';
@@ -30,7 +32,7 @@ import { useEffect } from 'react';
 import { cn } from './lib/utils';
 import type { Task } from './stores/task-store';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag' | 'saved-filter';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag' | 'saved-filter' | 'ai';
 
 interface SidebarGroup {
   id: string;
@@ -443,10 +445,23 @@ function App() {
           <Clock className="w-5 h-5" />
         </button>
 
+        <button
+          onClick={() => setCurrentView('ai')}
+          className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            currentView === 'ai'
+              ? 'bg-white text-blue-600 shadow-lg backdrop-blur-sm'
+              : 'text-white/80 hover:bg-white/20 hover:text-white'
+          )}
+          title="AI 助手"
+        >
+          <Bot className="w-5 h-5" />
+        </button>
+
       </div>
 
       {/* 左侧边栏 */}
-      {currentView !== 'calendar' && currentView !== 'pomodoro' && currentView !== 'stats' && (
+      {currentView !== 'calendar' && currentView !== 'pomodoro' && currentView !== 'stats' && currentView !== 'ai' && (
         <div className="w-80 glass-effect shadow-xl border-r border-white/20 dark:border-gray-700/50 flex flex-col">
           <>
           {/* 顶部 */}
@@ -892,6 +907,9 @@ function App() {
               <PomodoroTimer />
             </div>
           </div>
+        ) : currentView === 'ai' ? (
+          /* AI 助手视图 */
+          <AgentPanel />
         ) : currentView === 'stats' ? (
           <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
             <div className="mx-auto max-w-3xl">

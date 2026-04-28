@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { getDatabase } from '../database/db';
 import { planSnapshots, tasks } from '../database/schema';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { eq, desc } from 'drizzle-orm';
 
 export function registerSnapshotHandlers() {
@@ -13,7 +13,7 @@ export function registerSnapshotHandlers() {
     const allTasks = await db.select().from(tasks);
 
     const snapshot = {
-      id: uuidv4(),
+      id: randomUUID(),
       source,
       snapshotJson: JSON.stringify({ tasks: allTasks, timestamp: now }),
       createdAt: now,
