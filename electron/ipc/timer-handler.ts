@@ -3,6 +3,7 @@ import { getDatabase } from '../database/db';
 import { pomodoroSessions, settings } from '../database/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { behaviorTracker } from '../services/behavior-tracker';
 
 interface TimerState {
   isRunning: boolean;
@@ -228,6 +229,9 @@ async function completeSession() {
 
     if (timerState.sessionType === 'work') {
       timerState.completedPomodoros++;
+
+      // 追踪番茄钟完成
+      await behaviorTracker.trackPomodoroCompleted(timerState.totalTime);
     }
   }
 

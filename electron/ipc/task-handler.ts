@@ -5,6 +5,7 @@ import { and, eq, like, or, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { RecurrenceEngine } from '../services/recurrence-engine';
 import { broadcastToWindows } from '../utils/window-broadcast';
+import { behaviorTracker } from '../services/behavior-tracker';
 
 function emptyToNull(value: unknown): string | null {
   if (value === '' || value === undefined || value === null) {
@@ -139,6 +140,12 @@ export function registerTaskHandlers() {
       );
     }
 
+    // 追踪任务创建
+    await behaviorTracker.trackTaskCreated({
+      priority: task.priority,
+      tags: data.tagIds,
+    });
+
     const [enriched] = await enrichTasksWithTags(db, [task]);
     broadcastToWindows('tasks:changed');
     return enriched;
@@ -195,6 +202,11 @@ export function registerTaskHandlers() {
     const [updated] = await db.select().from(tasks).where(eq(tasks.id, id));
 
     if (existing.status !== 'completed' && updates.status === 'completed') {
+      // 追踪任务完成
+      await behaviorTracker.trackTaskCompleted({
+        duration: updated.duration || undefined,
+      });
+
       await RecurrenceEngine.generateNextInstance(id);
       await completeChildTasks(db, id);
       await db

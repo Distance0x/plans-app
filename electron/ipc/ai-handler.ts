@@ -1,14 +1,21 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { chatAndPlan, testConnection } from '../services/ai-service';
 import { saveAIConfig, loadAIConfig, deleteAIConfig, getSecretHealth } from '../services/keyvault';
+import { behaviorTracker } from '../services/behavior-tracker';
 
 export function registerAIHandlers() {
   ipcMain.handle('ai:chat', async (event, userText: string, threadId?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
 
-    return chatAndPlan({ userText, threadId }, (chunk) => {
+    const response = await chatAndPlan({ userText, threadId }, (chunk) => {
       win?.webContents.send('ai:stream', chunk);
     });
+
+    // 追踪 AI 对话
+    const tasksGenerated = response.draftActions.filter(a => a.type === 'create_task').length;
+    await behaviorTracker.trackAIConversation(tasksGenerated);
+
+    return response;
   });
 
   ipcMain.handle('ai:testConnection', async () => {
