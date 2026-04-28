@@ -73,6 +73,23 @@ export interface ElectronAPI {
     }>>;
     openAttachment: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
   };
+  ai: {
+    chat: (userText: string, threadId?: string) => Promise<{
+      responseId: string;
+      assistantText: string;
+      draftActions: Array<{
+        type: 'create_task' | 'update_task' | 'schedule_task';
+        payload: unknown;
+      }>;
+    }>;
+    saveApiKey: (apiKey: string) => Promise<{ success: boolean }>;
+    loadApiKey: () => Promise<{ apiKey: string | null }>;
+    deleteApiKey: () => Promise<{ success: boolean }>;
+    getHealth: () => Promise<{
+      encryptionAvailable: boolean;
+      backend: string;
+    }>;
+  };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }

@@ -94,6 +94,14 @@ contextBridge.exposeInMainWorld('electron', {
     openAttachment: (filePath: string) => ipcRenderer.invoke('file:open-attachment', filePath),
   },
 
+  ai: {
+    chat: (userText: string, threadId?: string) => ipcRenderer.invoke('ai:chat', userText, threadId),
+    saveApiKey: (apiKey: string) => ipcRenderer.invoke('ai:saveApiKey', apiKey),
+    loadApiKey: () => ipcRenderer.invoke('ai:loadApiKey'),
+    deleteApiKey: () => ipcRenderer.invoke('ai:deleteApiKey'),
+    getHealth: () => ipcRenderer.invoke('ai:getHealth'),
+  },
+
   // 事件监听
   on: (channel: string, callback: (...args: any[]) => void) => {
     const wrapped = (_: IpcRendererEvent, ...args: any[]) => callback(...args);

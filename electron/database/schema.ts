@@ -83,3 +83,50 @@ export const reminders = sqliteTable('reminders', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+export const aiThreads = sqliteTable('ai_threads', {
+  id: text('id').primaryKey(),
+  title: text('title'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  lastResponseId: text('last_response_id'),
+  summary: text('summary'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const aiActionsLog = sqliteTable('ai_actions_log', {
+  id: text('id').primaryKey(),
+  threadId: text('thread_id').notNull(),
+  actionType: text('action_type').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  applied: integer('applied', { mode: 'boolean' }).default(false),
+  createdAt: text('created_at').notNull(),
+});
+
+export const planSnapshots = sqliteTable('plan_snapshots', {
+  id: text('id').primaryKey(),
+  source: text('source').notNull(),
+  snapshotJson: text('snapshot_json').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const scheduleConstraints = sqliteTable('schedule_constraints', {
+  date: text('date').primaryKey(),
+  workStart: text('work_start'),
+  workEnd: text('work_end'),
+  focusBlockMin: integer('focus_block_min').default(25),
+  breakMin: integer('break_min').default(5),
+  noScheduleJson: text('no_schedule_json'),
+  energyLevel: text('energy_level', { enum: ['low', 'normal', 'high'] }),
+});
+
+export const attachments = sqliteTable('attachments', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull(),
+  originalName: text('original_name').notNull(),
+  storedPath: text('stored_path').notNull(),
+  mimeType: text('mime_type'),
+  size: integer('size'),
+  createdAt: text('created_at').notNull(),
+});

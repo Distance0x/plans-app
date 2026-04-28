@@ -5,6 +5,7 @@ import { registerTimerHandlers } from '../ipc/timer-handler';
 import { registerSettingsHandlers } from '../ipc/settings-handler';
 import { registerBackupHandlers } from '../ipc/backup-handler';
 import { registerOrganizationHandlers } from '../ipc/organization-handler';
+import { registerAIHandlers } from '../ipc/ai-handler';
 import { initReminderEngine, registerReminderHandlers, stopReminderEngine } from '../services/reminder-engine';
 import { initNotificationService } from '../services/notification-service';
 import { createAppTray } from '../utils/tray';
@@ -134,6 +135,7 @@ app.whenReady().then(async () => {
   registerBackupHandlers();
   registerOrganizationHandlers();
   registerReminderHandlers();
+  registerAIHandlers();
 
   // 注册窗口控制处理器
   ipcMain.on('window:minimize', () => {
