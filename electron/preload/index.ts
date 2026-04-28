@@ -102,6 +102,12 @@ contextBridge.exposeInMainWorld('electron', {
     getHealth: () => ipcRenderer.invoke('ai:getHealth'),
   },
 
+  snapshot: {
+    create: (source: string) => ipcRenderer.invoke('snapshot:create', source),
+    restore: (snapshotId: string) => ipcRenderer.invoke('snapshot:restore', snapshotId),
+    list: () => ipcRenderer.invoke('snapshot:list'),
+  },
+
   // 事件监听
   on: (channel: string, callback: (...args: any[]) => void) => {
     const wrapped = (_: IpcRendererEvent, ...args: any[]) => callback(...args);

@@ -96,6 +96,23 @@ export interface ElectronAPI {
       backend: string;
     }>;
   };
+  snapshot: {
+    create: (source: string) => Promise<{
+      id: string;
+      source: string;
+      snapshotJson: string;
+      createdAt: string;
+    }>;
+    restore: (snapshotId: string) => Promise<{
+      tasks: any[];
+      timestamp: string;
+    }>;
+    list: () => Promise<Array<{
+      id: string;
+      source: string;
+      createdAt: string;
+    }>>;
+  };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }

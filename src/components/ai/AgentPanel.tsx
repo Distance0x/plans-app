@@ -34,6 +34,9 @@ export function AgentPanel() {
   };
 
   const handleApply = async () => {
+    // 创建快照
+    await window.electron.snapshot.create('ai_agent');
+
     for (const action of draftActions) {
       if (action.type === 'create_task') {
         const tasks = action.payload as Array<{
