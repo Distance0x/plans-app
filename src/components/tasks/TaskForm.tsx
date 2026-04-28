@@ -11,6 +11,14 @@ interface TaskFormProps {
   taskId?: string;
   parentId?: string;
   onClose: () => void;
+  initialData?: {
+    title?: string;
+    description?: string;
+    priority?: 'high' | 'medium' | 'low';
+    dueDate?: string;
+    dueTime?: string;
+    duration?: number;
+  };
 }
 
 function toLocalDateTimeValue(value: string) {
@@ -81,7 +89,7 @@ const weekDayOptions = [
   { value: 0, label: '周日' },
 ];
 
-export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
+export function TaskForm({ taskId, parentId, onClose, initialData }: TaskFormProps) {
   const { tasks, lists, tags, fetchLists, fetchTags, createTag, createTask, updateTask } = useTaskStore();
   const { defaultReminderOffsets, defaultReminderChannel } = useSettingsStore();
   const existingTask = taskId ? tasks.find((t) => t.id === taskId) : null;
@@ -89,12 +97,12 @@ export function TaskForm({ taskId, parentId, onClose }: TaskFormProps) {
   const existingTagIds = existingTask?.tags?.map((tag) => tag.id) || [];
 
   const [formData, setFormData] = useState({
-    title: existingTask?.title || '',
-    description: existingTask?.description || '',
-    priority: existingTask?.priority || 'medium',
-    dueDate: existingTask?.dueDate || '',
-    dueTime: existingTask?.dueTime || '',
-    duration: String(existingTask?.duration || 60),
+    title: initialData?.title || existingTask?.title || '',
+    description: initialData?.description || existingTask?.description || '',
+    priority: initialData?.priority || existingTask?.priority || 'medium',
+    dueDate: initialData?.dueDate || existingTask?.dueDate || '',
+    dueTime: initialData?.dueTime || existingTask?.dueTime || '',
+    duration: String(initialData?.duration || existingTask?.duration || 60),
     listId: existingTask?.listId || 'inbox',
     tagIds: existingTagIds,
     newTagName: '',

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Bubble, Sender } from '@ant-design/x';
-import { UserOutlined, RobotOutlined, SettingOutlined, PlusOutlined, DeleteOutlined, ClearOutlined } from '@ant-design/icons';
+import { UserOutlined, RobotOutlined, SettingOutlined, PlusOutlined, DeleteOutlined, ClearOutlined, EditOutlined } from '@ant-design/icons';
 import { Select, Tag, Card, Button, Popconfirm } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTaskStore } from '../../stores/task-store';
+import { TaskForm } from '../tasks/TaskForm';
 
 interface AIConfig {
   baseURL: string;
@@ -49,6 +50,14 @@ export function AgentPanel() {
       return new Set();
     }
   });
+  const [editingTask, setEditingTask] = useState<{
+    title: string;
+    description?: string;
+    priority?: 'high' | 'medium' | 'low';
+    dueDate?: string;
+    dueTime?: string;
+    duration?: number;
+  } | null>(null);
 
   useEffect(() => {
     localStorage.setItem('ai-applied-messages', JSON.stringify([...appliedMessages]));
@@ -394,13 +403,11 @@ export function AgentPanel() {
                         appliedMessages.has(msg.id) ? (
                           <span className="text-sm text-green-600 font-medium">✓ 已创建</span>
                         ) : (
-                          <Button
-                            type="primary"
-                            size="small"
-                            onClick={async () => {
-                              if (appliedMessages.has(msg.id)) return;
-                              setAppliedMessages(prev => new Set(prev).add(msg.id));
-                              try {
+                          <div className="flex gap-2">
+                            <Button
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => {
                                 const tasks = msg.draftActions![0].payload as Array<{
                                   title: string;
                                   description?: string;
@@ -409,29 +416,52 @@ export function AgentPanel() {
                                   dueTime?: string;
                                   duration?: number;
                                 }>;
-                                for (const task of tasks) {
-                                  await createTask({
-                                    title: task.title,
-                                    description: task.description,
-                                    priority: task.priority || 'medium',
-                                    dueDate: task.dueDate,
-                                    dueTime: task.dueTime,
-                                    duration: task.duration || 60,
-                                  });
+                                if (tasks.length > 0) {
+                                  setEditingTask(tasks[0]);
                                 }
-                                clearDraft();
-                              } catch (error) {
-                                setAppliedMessages(prev => {
-                                  const next = new Set(prev);
-                                  next.delete(msg.id);
-                                  return next;
-                                });
-                                throw error;
-                              }
-                            }}
-                          >
-                            应用
-                          </Button>
+                              }}
+                            >
+                              修改
+                            </Button>
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={async () => {
+                                if (appliedMessages.has(msg.id)) return;
+                                setAppliedMessages(prev => new Set(prev).add(msg.id));
+                                try {
+                                  const tasks = msg.draftActions![0].payload as Array<{
+                                    title: string;
+                                    description?: string;
+                                    priority?: 'high' | 'medium' | 'low';
+                                    dueDate?: string;
+                                    dueTime?: string;
+                                    duration?: number;
+                                  }>;
+                                  for (const task of tasks) {
+                                    await createTask({
+                                      title: task.title,
+                                      description: task.description,
+                                      priority: task.priority || 'medium',
+                                      dueDate: task.dueDate,
+                                      dueTime: task.dueTime,
+                                      duration: task.duration || 60,
+                                    });
+                                  }
+                                  clearDraft();
+                                } catch (error) {
+                                  setAppliedMessages(prev => {
+                                    const next = new Set(prev);
+                                    next.delete(msg.id);
+                                    return next;
+                                  });
+                                  throw error;
+                                }
+                              }}
+                            >
+                              应用
+                            </Button>
+                          </div>
                         )
                       }
                     >
@@ -586,6 +616,13 @@ export function AgentPanel() {
           }}
         />
       </div>
+
+      {editingTask && (
+        <TaskForm
+          onClose={() => setEditingTask(null)}
+          initialData={editingTask}
+        />
+      )}
     </div>
   );
 }
