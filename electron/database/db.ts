@@ -134,6 +134,56 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS plan_snapshots (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_threads (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      title TEXT,
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      last_response_id TEXT,
+      summary TEXT,
+      parent_message_id TEXT,
+      metadata TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_actions_log (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      applied INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS schedule_constraints (
+      date TEXT PRIMARY KEY,
+      work_start TEXT,
+      work_end TEXT,
+      focus_block_min INTEGER DEFAULT 25,
+      break_min INTEGER DEFAULT 5,
+      no_schedule_json TEXT,
+      energy_level TEXT CHECK(energy_level IN ('low', 'normal', 'high'))
+    );
+
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      stored_path TEXT NOT NULL,
+      mime_type TEXT,
+      size INTEGER,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
@@ -142,6 +192,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_pomodoro_task_id ON pomodoro_sessions(task_id);
     CREATE INDEX IF NOT EXISTS idx_pomodoro_start_time ON pomodoro_sessions(start_time);
     CREATE INDEX IF NOT EXISTS idx_saved_filters_name ON saved_filters(name);
+    CREATE INDEX IF NOT EXISTS idx_ai_threads_session_id ON ai_threads(session_id);
   `);
 
   ensureColumn(sqlDb, 'tasks', 'duration', 'INTEGER DEFAULT 60');
@@ -151,7 +202,11 @@ function initDatabase(sqlDb: SqlJsDatabase) {
   ensureColumn(sqlDb, 'tasks', 'recurrence_rule', 'TEXT');
   ensureColumn(sqlDb, 'tasks', 'recurrence_parent_id', 'TEXT');
   ensureColumn(sqlDb, 'tasks', 'recurrence_count', 'INTEGER DEFAULT 0');
+  ensureColumn(sqlDb, 'ai_threads', 'session_id', "TEXT NOT NULL DEFAULT 'default'");
+  ensureColumn(sqlDb, 'ai_threads', 'parent_message_id', 'TEXT');
+  ensureColumn(sqlDb, 'ai_threads', 'metadata', 'TEXT');
   sqlDb.run('CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id)');
+  sqlDb.run('CREATE INDEX IF NOT EXISTS idx_ai_threads_session_id ON ai_threads(session_id)');
 
   // 插入默认设置
   const now = new Date().toISOString();

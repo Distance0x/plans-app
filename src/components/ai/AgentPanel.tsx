@@ -1,117 +1,462 @@
+import { useState, useEffect } from 'react';
 import { Bubble, Sender } from '@ant-design/x';
-import { UserOutlined, RobotOutlined } from '@ant-design/icons';
+import { UserOutlined, RobotOutlined, SettingOutlined, PlusOutlined, DeleteOutlined, ClearOutlined } from '@ant-design/icons';
+import { Select, Tag, Card, Button, Popconfirm } from 'antd';
+import ReactMarkdown from 'react-markdown';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTaskStore } from '../../stores/task-store';
 
+interface AIConfig {
+  baseURL: string;
+  apiKey: string;
+  model: string;
+}
+
 export function AgentPanel() {
-  const { messages, isLoading, draftActions, addMessage, setLoading, setDraftActions, clearDraft } = useAgentStore();
+  const {
+    currentSessionId,
+    sessions,
+    messages,
+    isLoading,
+    streamingThinking,
+    pendingToolCalls,
+    draftActions,
+    addMessage,
+    deleteMessage,
+    setLoading,
+    setDraftActions,
+    clearDraft,
+    createSession,
+    switchSession,
+    clearCurrentSession,
+  } = useAgentStore();
   const { createTask } = useTaskStore();
+
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [config, setConfig] = useState<AIConfig>({ baseURL: '', apiKey: '', model: '' });
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [inputValue, setInputValue] = useState('');
+
+  useEffect(() => {
+    loadConfig();
+  }, []);
+
+  const loadConfig = async () => {
+    try {
+      const result = await window.electron.ai.loadConfig();
+      if (result?.config?.baseURL && result?.config?.model) {
+        setConfig({
+          baseURL: result.config.baseURL,
+          apiKey: '',
+          model: result.config.model,
+        });
+        setIsConfigured(result.config.apiKey === '***');
+      }
+    } catch (error) {
+      console.error('Failed to load config:', error);
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    if (!config.baseURL || !config.model) {
+      setTestResult({ success: false, message: '请填写 URL 和模型' });
+      return;
+    }
+
+    if (!config.apiKey && !isConfigured) {
+      setTestResult({ success: false, message: '请填写 API Key' });
+      return;
+    }
+
+    try {
+      if (config.apiKey) {
+        await window.electron.ai.saveConfig(config);
+      } else {
+        await window.electron.ai.saveConfig({ ...config, apiKey: '' });
+      }
+      setIsConfigured(true);
+      setShowConfigModal(false);
+      setTestResult(null);
+    } catch (error) {
+      setTestResult({ success: false, message: '保存失败' });
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!config.baseURL || !config.model) {
+      setTestResult({ success: false, message: '请填写 URL 和模型' });
+      return;
+    }
+
+    if (!config.apiKey && !isConfigured) {
+      setTestResult({ success: false, message: '请填写 API Key' });
+      return;
+    }
+
+    setTestingConnection(true);
+    setTestResult(null);
+
+    try {
+      if (config.apiKey) {
+        await window.electron.ai.saveConfig(config);
+      }
+      await window.electron.ai.testConnection();
+      setTestResult({ success: true, message: '连接成功！' });
+      setIsConfigured(true);
+    } catch (error) {
+      setTestResult({ success: false, message: `连接失败: ${error instanceof Error ? error.message : '未知错误'}` });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const handleSend = async (message: string) => {
     if (!message.trim() || isLoading) return;
 
-    const userMessage = { role: 'user' as const, content: message };
+    const userMessage = {
+      id: `msg_${Date.now()}`,
+      role: 'user' as const,
+      content: message,
+      timestamp: Date.now(),
+    };
     addMessage(userMessage);
     setLoading(true);
+    setInputValue('');
 
     try {
       const response = await window.electron.ai.chat(message);
       addMessage({
+        id: `msg_${Date.now()}`,
         role: 'assistant',
         content: response.assistantText,
         draftActions: response.draftActions,
+        timestamp: Date.now(),
       });
       setDraftActions(response.draftActions);
     } catch (error) {
       addMessage({
+        id: `msg_${Date.now()}`,
         role: 'assistant',
         content: `错误: ${error instanceof Error ? error.message : '未知错误'}`,
+        timestamp: Date.now(),
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApply = async () => {
-    await window.electron.snapshot.create('ai_agent');
+  if (!isConfigured && !showConfigModal) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-pink-50/30 dark:from-gray-900/50 dark:via-blue-900/20 dark:to-purple-900/20">
+        <div className="text-center space-y-6 max-w-md">
+          <div className="relative">
+            <div className="absolute -top-10 -left-10 w-32 h-32 bg-blue-400/20 rounded-full blur-3xl" />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-purple-400/20 rounded-full blur-3xl" />
+            <RobotOutlined style={{ fontSize: 64, color: '#667eea' }} className="relative" />
+          </div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+            AI 任务助手
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            配置 AI 服务后即可开始使用
+          </p>
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 mx-auto"
+          >
+            <SettingOutlined />
+            配置 AI 服务
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-    for (const action of draftActions) {
-      if (action.type === 'create_task') {
-        const tasks = action.payload as Array<{
-          title: string;
-          description?: string;
-          priority?: 'high' | 'medium' | 'low';
-          dueDate?: string;
-          dueTime?: string;
-          duration?: number;
-        }>;
+  if (showConfigModal) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-pink-50/30 dark:from-gray-900/50 dark:via-blue-900/20 dark:to-purple-900/20 p-6">
+        <div className="w-full max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/50 p-8 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex items-center gap-3">
+            <SettingOutlined style={{ fontSize: 24, color: '#667eea' }} />
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">AI 服务配置</h2>
+          </div>
 
-        for (const task of tasks) {
-          await createTask({
-            title: task.title,
-            description: task.description,
-            priority: task.priority || 'medium',
-            dueDate: task.dueDate,
-            dueTime: task.dueTime,
-            duration: task.duration || 60,
-          });
-        }
-      }
-    }
-    clearDraft();
-  };
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                API Base URL
+              </label>
+              <input
+                type="text"
+                value={config.baseURL}
+                onChange={(e) => setConfig({ ...config, baseURL: e.target.value })}
+                placeholder="https://api.openai.com/v1"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                API Key
+              </label>
+              <input
+                type="password"
+                value={config.apiKey}
+                onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
+                placeholder={isConfigured && !config.apiKey ? "已保存（留空保持不变）" : "sk-..."}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Model
+              </label>
+              <input
+                type="text"
+                value={config.model}
+                onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                placeholder="gpt-4"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          {testResult && (
+            <div className={`p-3 rounded-xl text-sm ${
+              testResult.success
+                ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+            }`}>
+              {testResult.message}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleTestConnection}
+              disabled={testingConnection}
+              className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+            >
+              {testingConnection ? '测试中...' : '测试连接'}
+            </button>
+            <button
+              onClick={handleSaveConfig}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+            >
+              保存配置
+            </button>
+          </div>
+
+          {isConfigured && (
+            <button
+              onClick={() => setShowConfigModal(false)}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              取消
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
+    <div className="flex flex-col h-full bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-pink-50/30 dark:from-gray-900/50 dark:via-blue-900/20 dark:to-purple-900/20">
+      <div className="flex items-center justify-between p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <RobotOutlined style={{ fontSize: 24, color: '#667eea' }} />
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI 任务助手</h2>
+          <Select
+            value={currentSessionId}
+            onChange={switchSession}
+            style={{ width: 200 }}
+            options={sessions.map(s => ({ label: s.title, value: s.id }))}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => createSession()}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="新建会话"
+          >
+            <PlusOutlined style={{ fontSize: 18, color: '#667eea' }} />
+          </button>
+          <Popconfirm
+            title="确定清空当前会话？"
+            onConfirm={clearCurrentSession}
+            okText="确定"
+            cancelText="取消"
+          >
+            <button
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="清空会话"
+            >
+              <ClearOutlined style={{ fontSize: 18, color: '#667eea' }} />
+            </button>
+          </Popconfirm>
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="设置"
+          >
+            <SettingOutlined style={{ fontSize: 20, color: '#667eea' }} />
+          </button>
+        </div>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full space-y-6">
-            <div className="text-center">
-              <RobotOutlined style={{ fontSize: 64, color: '#1890ff' }} />
-              <h2 className="mt-4 text-2xl font-bold text-gray-800 dark:text-gray-200">
-                AI 任务助手
-              </h2>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
-                我可以帮你创建任务、规划日程、分析习惯
-              </p>
-            </div>
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+            <RobotOutlined style={{ fontSize: 48, color: '#667eea', opacity: 0.5 }} />
+            <p className="text-gray-500 dark:text-gray-400">
+              我可以帮你创建任务、规划日程、分析习惯
+            </p>
           </div>
         )}
 
-        {messages.map((msg, idx) => (
-          <Bubble
-            key={idx}
-            placement={msg.role === 'user' ? 'end' : 'start'}
-            avatar={<div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white">
-              {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
-            </div>}
-            content={msg.content}
-            styles={{
-              content: {
-                background: msg.role === 'user'
-                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                  : undefined,
-                color: msg.role === 'user' ? '#fff' : undefined,
+        {messages.map((msg) => (
+          <div key={msg.id} className="relative group">
+            <Bubble
+              placement={msg.role === 'user' ? 'end' : 'start'}
+              avatar={
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-md">
+                  {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
+                </div>
               }
-            }}
-          />
+              content={
+                <div>
+                  {msg.thinking && (
+                    <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-gray-600 dark:text-gray-400">
+                      <div className="font-semibold mb-1">💭 思考过程：</div>
+                      <div className="whitespace-pre-wrap">{msg.thinking}</div>
+                    </div>
+                  )}
+                  {msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {msg.toolCalls.map((tool) => (
+                        <Tag
+                          key={tool.id}
+                          color={tool.status === 'completed' ? 'green' : tool.status === 'failed' ? 'red' : 'blue'}
+                        >
+                          🔧 {tool.name}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                  {msg.draftActions && msg.draftActions.length > 0 && msg.draftActions[0].type === 'create_task' && (
+                    <Card
+                      size="small"
+                      className="mt-2"
+                      title="📋 待创建任务"
+                      extra={
+                        <Button
+                          type="primary"
+                          size="small"
+                          onClick={async () => {
+                            const tasks = msg.draftActions![0].payload as Array<{
+                              title: string;
+                              description?: string;
+                              priority?: 'high' | 'medium' | 'low';
+                              dueDate?: string;
+                              dueTime?: string;
+                              duration?: number;
+                            }>;
+                            for (const task of tasks) {
+                              await createTask({
+                                title: task.title,
+                                description: task.description,
+                                priority: task.priority || 'medium',
+                                dueDate: task.dueDate,
+                                dueTime: task.dueTime,
+                                duration: task.duration || 60,
+                              });
+                            }
+                            clearDraft();
+                          }}
+                        >
+                          应用
+                        </Button>
+                      }
+                    >
+                      {((msg.draftActions[0].payload as any[]) || []).map((task: any, idx: number) => (
+                        <div key={idx} className="text-sm py-1">
+                          • {task.title} {task.dueDate && `(${task.dueDate})`}
+                        </div>
+                      ))}
+                    </Card>
+                  )}
+                </div>
+              }
+              styles={{
+                content: {
+                  background: msg.role === 'user'
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : 'rgba(255, 255, 255, 0.9)',
+                  color: msg.role === 'user' ? '#fff' : undefined,
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                }
+              }}
+            />
+            {msg.role === 'assistant' && (
+              <Popconfirm
+                title="确定删除此消息？"
+                onConfirm={() => deleteMessage(msg.id)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <button
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-opacity"
+                >
+                  <DeleteOutlined style={{ fontSize: 14 }} />
+                </button>
+              </Popconfirm>
+            )}
+          </div>
         ))}
 
         {isLoading && (
           <Bubble
             placement="start"
-            avatar={<div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white">
-              <RobotOutlined />
-            </div>}
-            content="正在思考..."
+            avatar={
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-md">
+                <RobotOutlined />
+              </div>
+            }
+            content={
+              <div>
+                {streamingThinking && (
+                  <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-gray-600 dark:text-gray-400">
+                    <div className="font-semibold mb-1">💭 思考中...</div>
+                    <div className="whitespace-pre-wrap">{streamingThinking}</div>
+                  </div>
+                )}
+                {pendingToolCalls.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {pendingToolCalls.map((tool) => (
+                      <Tag key={tool.id} color="processing">
+                        🔧 {tool.name}
+                      </Tag>
+                    ))}
+                  </div>
+                )}
+                <div>正在思考...</div>
+              </div>
+            }
             loading
           />
         )}
       </div>
 
       {draftActions.length > 0 && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20">
-          <div className="flex items-center justify-between mb-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
             <div>
               <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
                 🎯 待确认操作
@@ -126,14 +471,39 @@ export function AgentPanel() {
             </div>
             <div className="space-x-2">
               <button
-                onClick={handleApply}
-                className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 text-sm font-medium shadow-sm transition-all"
+                onClick={async () => {
+                  await window.electron.snapshot.create('ai_agent');
+                  for (const action of draftActions) {
+                    if (action.type === 'create_task') {
+                      const tasks = action.payload as Array<{
+                        title: string;
+                        description?: string;
+                        priority?: 'high' | 'medium' | 'low';
+                        dueDate?: string;
+                        dueTime?: string;
+                        duration?: number;
+                      }>;
+                      for (const task of tasks) {
+                        await createTask({
+                          title: task.title,
+                          description: task.description,
+                          priority: task.priority || 'medium',
+                          dueDate: task.dueDate,
+                          dueTime: task.dueTime,
+                          duration: task.duration || 60,
+                        });
+                      }
+                    }
+                  }
+                  clearDraft();
+                }}
+                className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium"
               >
                 ✓ 应用
               </button>
               <button
                 onClick={clearDraft}
-                className="px-4 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm font-medium shadow-sm transition-all"
+                className="px-4 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all text-sm font-medium"
               >
                 ✕ 取消
               </button>
@@ -144,7 +514,9 @@ export function AgentPanel() {
 
       <div className="border-t border-gray-200/50 dark:border-gray-700/50 p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
         <Sender
-          placeholder="输入任务描述，让 AI 帮你规划..."
+          placeholder="输入任务描述,让 AI 帮你规划..."
+          value={inputValue}
+          onChange={setInputValue}
           onSubmit={handleSend}
           loading={isLoading}
           disabled={isLoading}

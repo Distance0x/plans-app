@@ -5,38 +5,144 @@ interface DraftAction {
   payload: unknown;
 }
 
+interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'pending' | 'completed' | 'failed';
+}
+
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
+  thinking?: string;
+  toolCalls?: ToolCall[];
   draftActions?: DraftAction[];
+  timestamp: number;
+}
+
+interface Session {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 interface AgentState {
+  currentSessionId: string;
+  sessions: Session[];
   messages: Message[];
   isLoading: boolean;
+  streamingThinking: string;
+  pendingToolCalls: ToolCall[];
   draftActions: DraftAction[];
+
   addMessage: (message: Message) => void;
+  deleteMessage: (messageId: string) => void;
   setLoading: (loading: boolean) => void;
+  setStreamingThinking: (thinking: string) => void;
+  setPendingToolCalls: (toolCalls: ToolCall[]) => void;
   setDraftActions: (actions: DraftAction[]) => void;
   clearDraft: () => void;
+
+  createSession: (title?: string) => string;
+  switchSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
+  clearCurrentSession: () => void;
   reset: () => void;
 }
 
 export const useAgentStore = create<AgentState>((set) => ({
+  currentSessionId: 'default',
+  sessions: [{ id: 'default', title: '默认会话', createdAt: Date.now(), updatedAt: Date.now() }],
   messages: [],
   isLoading: false,
+  streamingThinking: '',
+  pendingToolCalls: [],
   draftActions: [],
 
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, message],
+      sessions: state.sessions.map(s =>
+        s.id === state.currentSessionId
+          ? { ...s, updatedAt: Date.now(), title: s.title || message.content.slice(0, 30) }
+          : s
+      ),
+    })),
+
+  deleteMessage: (messageId) =>
+    set((state) => ({
+      messages: state.messages.filter(m => m.id !== messageId),
     })),
 
   setLoading: (loading) => set({ isLoading: loading }),
+
+  setStreamingThinking: (thinking) => set({ streamingThinking: thinking }),
+
+  setPendingToolCalls: (toolCalls) => set({ pendingToolCalls: toolCalls }),
 
   setDraftActions: (actions) => set({ draftActions: actions }),
 
   clearDraft: () => set({ draftActions: [] }),
 
-  reset: () => set({ messages: [], isLoading: false, draftActions: [] }),
+  createSession: (title) => {
+    const id = `session_${Date.now()}`;
+    const session: Session = {
+      id,
+      title: title || '新会话',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    set((state) => ({
+      sessions: [...state.sessions, session],
+      currentSessionId: id,
+      messages: [],
+      draftActions: [],
+      streamingThinking: '',
+      pendingToolCalls: [],
+    }));
+    return id;
+  },
+
+  switchSession: (sessionId) =>
+    set({
+      currentSessionId: sessionId,
+      messages: [],
+      draftActions: [],
+      streamingThinking: '',
+      pendingToolCalls: [],
+    }),
+
+  deleteSession: (sessionId) =>
+    set((state) => {
+      const newSessions = state.sessions.filter(s => s.id !== sessionId);
+      const newCurrentId = state.currentSessionId === sessionId
+        ? (newSessions[0]?.id || 'default')
+        : state.currentSessionId;
+      return {
+        sessions: newSessions.length > 0 ? newSessions : [{ id: 'default', title: '默认会话', createdAt: Date.now(), updatedAt: Date.now() }],
+        currentSessionId: newCurrentId,
+        messages: newCurrentId !== state.currentSessionId ? [] : state.messages,
+      };
+    }),
+
+  clearCurrentSession: () =>
+    set({
+      messages: [],
+      draftActions: [],
+      streamingThinking: '',
+      pendingToolCalls: [],
+    }),
+
+  reset: () => set({
+    currentSessionId: 'default',
+    sessions: [{ id: 'default', title: '默认会话', createdAt: Date.now(), updatedAt: Date.now() }],
+    messages: [],
+    isLoading: false,
+    streamingThinking: '',
+    pendingToolCalls: [],
+    draftActions: [],
+  }),
 }));

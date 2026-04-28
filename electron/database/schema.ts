@@ -86,11 +86,14 @@ export const reminders = sqliteTable('reminders', {
 
 export const aiThreads = sqliteTable('ai_threads', {
   id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
   title: text('title'),
   provider: text('provider').notNull(),
   model: text('model').notNull(),
   lastResponseId: text('last_response_id'),
   summary: text('summary'),
+  parentMessageId: text('parent_message_id'),
+  metadata: text('metadata'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
