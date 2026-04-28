@@ -1,24 +1,31 @@
 import { ipcMain } from 'electron';
 import { chatAndPlan } from '../services/ai-service';
-import { saveSecret, loadSecret, deleteSecret, getSecretHealth } from '../services/keyvault';
+import { saveAIConfig, loadAIConfig, deleteAIConfig, getSecretHealth } from '../services/keyvault';
 
 export function registerAIHandlers() {
   ipcMain.handle('ai:chat', async (_event, userText: string, threadId?: string) => {
     return chatAndPlan({ userText, threadId });
   });
 
-  ipcMain.handle('ai:saveApiKey', async (_event, apiKey: string) => {
-    saveSecret('openai_api_key', apiKey);
+  ipcMain.handle('ai:saveConfig', async (_event, baseURL: string, apiKey: string, model: string) => {
+    saveAIConfig({ baseURL, apiKey, model });
     return { success: true };
   });
 
-  ipcMain.handle('ai:loadApiKey', async () => {
-    const apiKey = loadSecret('openai_api_key');
-    return { apiKey: apiKey ? '***' : null };
+  ipcMain.handle('ai:loadConfig', async () => {
+    const config = loadAIConfig();
+    if (!config) return { config: null };
+    return {
+      config: {
+        baseURL: config.baseURL,
+        apiKey: '***',
+        model: config.model,
+      },
+    };
   });
 
-  ipcMain.handle('ai:deleteApiKey', async () => {
-    deleteSecret('openai_api_key');
+  ipcMain.handle('ai:deleteConfig', async () => {
+    deleteAIConfig();
     return { success: true };
   });
 

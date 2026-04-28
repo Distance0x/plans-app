@@ -4,7 +4,13 @@ import path from 'node:path';
 
 const secretFile = path.join(app.getPath('userData'), 'secrets.json');
 
-export function saveSecret(key: string, value: string): void {
+interface AIConfig {
+  baseURL: string;
+  apiKey: string;
+  model: string;
+}
+
+export function saveAIConfig(config: AIConfig): void {
   if (!safeStorage.isEncryptionAvailable()) {
     throw new Error('OS encryption unavailable');
   }
@@ -13,24 +19,25 @@ export function saveSecret(key: string, value: string): void {
     ? JSON.parse(fs.readFileSync(secretFile, 'utf8'))
     : {};
 
-  raw[key] = safeStorage.encryptString(value).toString('base64');
+  raw.ai_config = safeStorage.encryptString(JSON.stringify(config)).toString('base64');
   fs.writeFileSync(secretFile, JSON.stringify(raw, null, 2), 'utf8');
 }
 
-export function loadSecret(key: string): string | null {
+export function loadAIConfig(): AIConfig | null {
   if (!fs.existsSync(secretFile)) return null;
 
   const raw = JSON.parse(fs.readFileSync(secretFile, 'utf8'));
-  if (!raw[key]) return null;
+  if (!raw.ai_config) return null;
 
-  return safeStorage.decryptString(Buffer.from(raw[key], 'base64'));
+  const decrypted = safeStorage.decryptString(Buffer.from(raw.ai_config, 'base64'));
+  return JSON.parse(decrypted);
 }
 
-export function deleteSecret(key: string): void {
+export function deleteAIConfig(): void {
   if (!fs.existsSync(secretFile)) return;
 
   const raw = JSON.parse(fs.readFileSync(secretFile, 'utf8'));
-  delete raw[key];
+  delete raw.ai_config;
   fs.writeFileSync(secretFile, JSON.stringify(raw, null, 2), 'utf8');
 }
 

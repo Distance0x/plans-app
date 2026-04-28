@@ -82,9 +82,15 @@ export interface ElectronAPI {
         payload: unknown;
       }>;
     }>;
-    saveApiKey: (apiKey: string) => Promise<{ success: boolean }>;
-    loadApiKey: () => Promise<{ apiKey: string | null }>;
-    deleteApiKey: () => Promise<{ success: boolean }>;
+    saveConfig: (baseURL: string, apiKey: string, model: string) => Promise<{ success: boolean }>;
+    loadConfig: () => Promise<{
+      config: {
+        baseURL: string;
+        apiKey: string;
+        model: string;
+      } | null;
+    }>;
+    deleteConfig: () => Promise<{ success: boolean }>;
     getHealth: () => Promise<{
       encryptionAvailable: boolean;
       backend: string;

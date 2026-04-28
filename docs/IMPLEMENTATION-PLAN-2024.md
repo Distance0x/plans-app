@@ -377,6 +377,45 @@ CREATE TABLE attachments (
 
 ---
 
+### Milestone 7: 用户画像与智能推荐（7 天）🆕
+**目标**: 通过分析用户行为习惯，提供个性化的任务安排和时间规划建议
+
+**Phase 1: 数据采集基础设施（2 天）**
+- [ ] 扩展数据库 Schema（userBehaviorLog, userProfile）
+- [ ] 创建 `electron/services/behavior-tracker.ts`
+- [ ] 集成事件采集（任务完成、番茄钟、AI 对话）
+- [ ] 实现数据聚合定时任务（每日统计）
+
+**Phase 2: 用户画像构建（2 天）**
+- [ ] 创建 `electron/services/profile-builder.ts`
+- [ ] 实现高效时段识别算法
+- [ ] 实现拖延指数计算
+- [ ] 实现任务时长预测模型
+- [ ] 创建 `src/components/profile/ProfileView.tsx`
+
+**Phase 3: 智能推荐集成（2 天）**
+- [ ] 扩展 `scheduling-engine.ts` 集成画像数据
+- [ ] 实现任务时段推荐（recommendTaskTime）
+- [ ] 实现时长预测（predictTaskDuration）
+- [ ] 番茄钟个性化设置
+- [ ] AI 对话风格适配（getAISystemPrompt）
+
+**Phase 4: 测试与优化（1 天）**
+- [ ] 冷启动场景测试（新用户无历史数据）
+- [ ] 推荐准确度验证
+- [ ] 性能测试（大量历史数据）
+- [ ] 隐私保护验证
+
+**验收标准**:
+- ✅ 新任务自动推荐最佳执行时段
+- ✅ 时长预测误差 < ±20%
+- ✅ AI 建议采纳率 > 60%
+- ✅ 用户可查看、导出、删除行为数据
+
+**详细设计**: 参见 [MILESTONE-USER-PROFILE.md](./MILESTONE-USER-PROFILE.md)
+
+---
+
 ## 🚨 风险与应对
 
 | 风险 | 影响 | 应对措施 |
@@ -397,12 +436,15 @@ CREATE TABLE attachments (
 - [ ] AI Agent 对话成功率 > 95%
 - [ ] 中文 NLP 解析准确率 > 80%
 - [ ] 智能调度采纳率 > 60%（用户应用 AI 建议的比例）
+- [ ] 用户画像推荐准确度 > 70%（时段推荐被采纳的比例）🆕
+- [ ] 任务时长预测误差 < ±20%🆕
 - [ ] 备份恢复成功率 = 100%
 - [ ] ICS 导出兼容性 > 95%（主流日历应用）
 
 ### 性能指标
 - [ ] AI 响应时间 < 3s（P95）
 - [ ] 智能排期计算时间 < 1s（100 个任务）
+- [ ] 用户画像计算时间 < 500ms🆕
 - [ ] 备份导出时间 < 5s（1000 个任务 + 100MB 附件）
 - [ ] 应用冷启动 < 2s
 

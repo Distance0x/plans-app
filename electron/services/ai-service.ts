@@ -1,4 +1,4 @@
-import { loadSecret } from './keyvault';
+import { loadAIConfig } from './keyvault';
 
 interface ChatRequest {
   userText: string;
@@ -17,16 +17,16 @@ interface DraftAction {
 }
 
 export async function chatAndPlan(_request: ChatRequest): Promise<ChatResponse> {
-  const apiKey = loadSecret('openai_api_key');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
+  const config = loadAIConfig();
+  if (!config) {
+    throw new Error('AI configuration not set');
   }
 
-  // TODO: Implement OpenAI Responses API integration
+  // TODO: Implement OpenAI Compatible API integration
   // This is a placeholder for Milestone 2
   return {
     responseId: 'placeholder',
-    assistantText: 'AI service ready. Full implementation in Milestone 2.',
+    assistantText: `AI service ready. Config: ${config.baseURL} / ${config.model}`,
     draftActions: [],
   };
 }
