@@ -16,7 +16,8 @@ import {
   Maximize2,
   X,
   ExternalLink,
-  Bot
+  Bot,
+  User
 } from 'lucide-react';
 import { TaskList } from './components/tasks/TaskList';
 import { TaskDetailPanel } from './components/tasks/TaskDetailPanel';
@@ -24,6 +25,7 @@ import { PomodoroTimer } from './components/timer/PomodoroTimer';
 import { FocusStats } from './components/timer/FocusStats';
 import { Calendar as CalendarView } from './components/calendar/Calendar';
 import { AgentPanel } from './components/ai/AgentPanel';
+import { UserProfilePanel } from './components/profile/UserProfilePanel';
 // import { MascotWidget } from './components/mascot';
 import { useTaskStore } from './stores/task-store';
 import { useTimerStore } from './stores/timer-store';
@@ -32,7 +34,7 @@ import { useEffect } from 'react';
 import { cn } from './lib/utils';
 import type { Task } from './stores/task-store';
 
-type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag' | 'saved-filter' | 'ai';
+type ViewType = 'today' | 'recent' | 'inbox' | 'calendar' | 'pomodoro' | 'stats' | 'search' | 'group' | 'list' | 'tag' | 'saved-filter' | 'ai' | 'profile';
 
 interface SidebarGroup {
   id: string;
@@ -458,10 +460,23 @@ function App() {
           <Bot className="w-5 h-5" />
         </button>
 
+        <button
+          onClick={() => setCurrentView('profile')}
+          className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-all hover-lift',
+            currentView === 'profile'
+              ? 'bg-white text-purple-600 shadow-lg backdrop-blur-sm'
+              : 'text-white/80 hover:bg-white/20 hover:text-white'
+          )}
+          title="用户画像"
+        >
+          <User className="w-5 h-5" />
+        </button>
+
       </div>
 
       {/* 左侧边栏 */}
-      {currentView !== 'calendar' && currentView !== 'pomodoro' && currentView !== 'stats' && currentView !== 'ai' && (
+      {currentView !== 'calendar' && currentView !== 'pomodoro' && currentView !== 'stats' && currentView !== 'ai' && currentView !== 'profile' && (
         <div className="w-80 glass-effect shadow-xl border-r border-white/20 dark:border-gray-700/50 flex flex-col">
           <>
           {/* 顶部 */}
@@ -910,6 +925,9 @@ function App() {
         ) : currentView === 'ai' ? (
           /* AI 助手视图 */
           <AgentPanel />
+        ) : currentView === 'profile' ? (
+          /* 用户画像视图 */
+          <UserProfilePanel />
         ) : currentView === 'stats' ? (
           <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50">
             <div className="mx-auto max-w-3xl">
