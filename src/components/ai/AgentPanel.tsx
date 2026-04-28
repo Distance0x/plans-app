@@ -41,7 +41,18 @@ export function AgentPanel() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [applyingDraft, setApplyingDraft] = useState(false);
-  const [appliedMessages, setAppliedMessages] = useState<Set<string>>(new Set());
+  const [appliedMessages, setAppliedMessages] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('ai-applied-messages');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ai-applied-messages', JSON.stringify([...appliedMessages]));
+  }, [appliedMessages]);
 
   useEffect(() => {
     loadConfig();

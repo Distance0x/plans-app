@@ -101,6 +101,12 @@ contextBridge.exposeInMainWorld('electron', {
     loadConfig: () => ipcRenderer.invoke('ai:loadConfig'),
     deleteConfig: () => ipcRenderer.invoke('ai:deleteConfig'),
     getHealth: () => ipcRenderer.invoke('ai:getHealth'),
+    messages: {
+      save: (message: any) => ipcRenderer.invoke('ai:messages:save', message),
+      load: (sessionId: string) => ipcRenderer.invoke('ai:messages:load', sessionId),
+      delete: (messageId: string) => ipcRenderer.invoke('ai:messages:delete', messageId),
+      clearSession: (sessionId: string) => ipcRenderer.invoke('ai:messages:clear-session', sessionId),
+    },
   },
 
   snapshot: {

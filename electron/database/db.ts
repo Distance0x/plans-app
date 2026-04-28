@@ -155,6 +155,18 @@ function initDatabase(sqlDb: SqlJsDatabase) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS ai_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT CHECK(role IN ('user', 'assistant')) NOT NULL,
+      content TEXT NOT NULL,
+      thinking TEXT,
+      tool_calls TEXT,
+      draft_actions TEXT,
+      timestamp INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS ai_actions_log (
       id TEXT PRIMARY KEY,
       thread_id TEXT NOT NULL,
@@ -226,6 +238,7 @@ function initDatabase(sqlDb: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_pomodoro_start_time ON pomodoro_sessions(start_time);
     CREATE INDEX IF NOT EXISTS idx_saved_filters_name ON saved_filters(name);
     CREATE INDEX IF NOT EXISTS idx_ai_threads_session_id ON ai_threads(session_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages(session_id);
     CREATE INDEX IF NOT EXISTS idx_behavior_stats_date ON user_behavior_stats(date);
   `);
 
@@ -278,4 +291,4 @@ function ensureColumn(sqlDb: SqlJsDatabase, table: string, column: string, defin
   }
 }
 
-export { schema };
+export { schema, db };

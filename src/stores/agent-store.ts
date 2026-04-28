@@ -63,19 +63,39 @@ export const useAgentStore = create<AgentState>((set) => ({
   draftActions: [],
 
   addMessage: (message) =>
-    set((state) => ({
-      messages: [...state.messages, message],
-      sessions: state.sessions.map(s =>
-        s.id === state.currentSessionId
-          ? { ...s, updatedAt: Date.now(), title: s.title || message.content.slice(0, 30) }
-          : s
-      ),
-    })),
+    set((state) => {
+      // 保存消息到数据库
+      window.electron.ai.messages.save({
+        id: message.id,
+        sessionId: state.currentSessionId,
+        role: message.role,
+        content: message.content,
+        thinking: message.thinking,
+        toolCalls: message.toolCalls,
+        draftActions: message.draftActions,
+        timestamp: message.timestamp,
+      }).catch(err => console.error('Failed to save message:', err));
+
+      return {
+        messages: [...state.messages, message],
+        sessions: state.sessions.map(s =>
+          s.id === state.currentSessionId
+            ? { ...s, updatedAt: Date.now(), title: s.title || message.content.slice(0, 30) }
+            : s
+        ),
+      };
+    }),
 
   deleteMessage: (messageId) =>
-    set((state) => ({
-      messages: state.messages.filter(m => m.id !== messageId),
-    })),
+    set((state) => {
+      // 从数据库删除消息
+      window.electron.ai.messages.delete(messageId)
+        .catch(err => console.error('Failed to delete message:', err));
+
+      return {
+        messages: state.messages.filter(m => m.id !== messageId),
+      };
+    }),
 
   setLoading: (loading) => set({ isLoading: loading }),
 
@@ -107,12 +127,21 @@ export const useAgentStore = create<AgentState>((set) => ({
   },
 
   switchSession: (sessionId) =>
-    set({
-      currentSessionId: sessionId,
-      messages: [],
-      draftActions: [],
-      streamingThinking: '',
-      pendingToolCalls: [],
+    set(() => {
+      // 从数据库加载会话消息
+      window.electron.ai.messages.load(sessionId)
+        .then(loadedMessages => {
+          set({ messages: loadedMessages });
+        })
+        .catch(err => console.error('Failed to load messages:', err));
+
+      return {
+        currentSessionId: sessionId,
+        messages: [],
+        draftActions: [],
+        streamingThinking: '',
+        pendingToolCalls: [],
+      };
     }),
 
   deleteSession: (sessionId) =>
@@ -129,11 +158,17 @@ export const useAgentStore = create<AgentState>((set) => ({
     }),
 
   clearCurrentSession: () =>
-    set({
-      messages: [],
-      draftActions: [],
-      streamingThinking: '',
-      pendingToolCalls: [],
+    set((state) => {
+      // 从数据库清除当前会话的所有消息
+      window.electron.ai.messages.clearSession(state.currentSessionId)
+        .catch(err => console.error('Failed to clear session:', err));
+
+      return {
+        messages: [],
+        draftActions: [],
+        streamingThinking: '',
+        pendingToolCalls: [],
+      };
     }),
 
   reset: () => set({

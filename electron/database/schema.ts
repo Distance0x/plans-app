@@ -98,6 +98,18 @@ export const aiThreads = sqliteTable('ai_threads', {
   updatedAt: text('updated_at').notNull(),
 });
 
+export const aiMessages = sqliteTable('ai_messages', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  role: text('role', { enum: ['user', 'assistant'] }).notNull(),
+  content: text('content').notNull(),
+  thinking: text('thinking'),
+  toolCalls: text('tool_calls'), // JSON string
+  draftActions: text('draft_actions'), // JSON string
+  timestamp: integer('timestamp').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 export const aiActionsLog = sqliteTable('ai_actions_log', {
   id: text('id').primaryKey(),
   threadId: text('thread_id').notNull(),

@@ -103,6 +103,29 @@ export interface ElectronAPI {
       encryptionAvailable: boolean;
       backend: string;
     }>;
+    messages: {
+      save: (message: {
+        id: string;
+        sessionId: string;
+        role: 'user' | 'assistant';
+        content: string;
+        thinking?: string;
+        toolCalls?: any[];
+        draftActions?: any[];
+        timestamp: number;
+      }) => Promise<{ success: boolean }>;
+      load: (sessionId: string) => Promise<Array<{
+        id: string;
+        role: 'user' | 'assistant';
+        content: string;
+        thinking?: string;
+        toolCalls?: any[];
+        draftActions?: any[];
+        timestamp: number;
+      }>>;
+      delete: (messageId: string) => Promise<{ success: boolean }>;
+      clearSession: (sessionId: string) => Promise<{ success: boolean }>;
+    };
   };
   snapshot: {
     create: (source: string) => Promise<{
