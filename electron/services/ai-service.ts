@@ -202,129 +202,126 @@ export async function chatAndPlan(
     ...request.messages,
   ];
 
-  const stream = await client.chat.completions.create({
-    model: config.model,
-    messages,
-    tools,
-    tool_choice: 'auto',
-    stream: true,
-  });
-
-  let assistantText = '';
-  let thinking = '';
-  const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>();
+  const MAX_ITERATIONS = 5;
+  let iterations = 0;
+  const allToolCalls: ToolCallInfo[] = [];
   const draftActions: DraftAction[] = [];
 
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta;
-    if (!delta) continue;
+  while (iterations < MAX_ITERATIONS) {
+    const response = await client.chat.completions.create({
+      model: config.model,
+      messages,
+      tools,
+      tool_choice: 'auto',
+      stream: false,
+    });
 
-    if (delta.content) {
-      assistantText += delta.content;
-      onStream?.({ content: delta.content });
+    const choice = response.choices[0];
+    const message = choice.message;
+
+    if (!message.tool_calls || message.tool_calls.length === 0) {
+      return {
+        responseId: randomUUID(),
+        assistantText: message.content || '已完成',
+        draftActions,
+        toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
+      };
     }
 
-    if (delta.tool_calls) {
-      for (const toolCall of delta.tool_calls) {
-        const index = toolCall.index;
-        const existing = toolCallsMap.get(index);
+    messages.push(message);
 
-        if (!existing) {
-          toolCallsMap.set(index, {
-            id: toolCall.id || '',
-            name: toolCall.function?.name || '',
-            arguments: toolCall.function?.arguments || '',
-          });
-        } else {
-          if (toolCall.function?.arguments) {
-            existing.arguments += toolCall.function.arguments;
+    for (const toolCall of message.tool_calls) {
+      if (toolCall.type !== 'function') continue;
+
+      const toolInfo: ToolCallInfo = {
+        id: toolCall.id,
+        name: toolCall.function.name,
+        arguments: toolCall.function.arguments,
+        status: 'completed',
+      };
+      allToolCalls.push(toolInfo);
+      onStream?.({ toolCalls: allToolCalls });
+
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        let toolResult: any = { success: true };
+
+        if (toolCall.function.name === 'get_tasks') {
+          const { getDatabase } = await import('../database/db');
+          const { tasks } = await import('../database/schema');
+          const { eq } = await import('drizzle-orm');
+
+          const db = await getDatabase();
+          let query = db.select().from(tasks);
+
+          if (args.status && args.status !== 'all') {
+            query = query.where(eq(tasks.status, args.status)) as any;
           }
+
+          let result = await query;
+
+          if (args.keyword) {
+            const keyword = args.keyword.toLowerCase();
+            result = result.filter(t => t.title.toLowerCase().includes(keyword));
+          }
+
+          toolResult = result.map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            priority: t.priority,
+            dueDate: t.dueDate,
+            dueTime: t.dueTime,
+          }));
+        } else if (toolCall.function.name === 'create_tasks') {
+          draftActions.push({
+            type: 'create_task',
+            payload: args.tasks,
+          });
+          toolResult = { success: true, message: '任务已加入待确认列表' };
+        } else if (toolCall.function.name === 'update_tasks') {
+          draftActions.push({
+            type: 'update_task',
+            payload: args.updates,
+          });
+          toolResult = { success: true, message: '任务更新已加入待确认列表' };
+        } else if (toolCall.function.name === 'schedule_tasks') {
+          draftActions.push({
+            type: 'schedule_task',
+            payload: args.schedules,
+          });
+          toolResult = { success: true, message: '任务安排已加入待确认列表' };
+        } else if (toolCall.function.name === 'update_user_profile') {
+          await saveUserProfileSettings(args);
+          draftActions.push({
+            type: 'update_profile',
+            payload: args,
+          });
+          toolResult = { success: true, message: '用户画像已更新' };
         }
-      }
 
-      const toolCalls: ToolCallInfo[] = Array.from(toolCallsMap.values()).map(tc => ({
-        id: tc.id,
-        name: tc.name,
-        arguments: tc.arguments,
-        status: 'pending' as const,
-      }));
-      onStream?.({ toolCalls });
-    }
-  }
-
-  const completedToolCalls: ToolCallInfo[] = Array.from(toolCallsMap.values()).map(tc => ({
-    id: tc.id,
-    name: tc.name,
-    arguments: tc.arguments,
-    status: 'completed' as const,
-  }));
-
-  for (const toolCall of completedToolCalls) {
-    try {
-      const args = JSON.parse(toolCall.arguments);
-
-      if (toolCall.name === 'get_tasks') {
-        const { getDatabase } = await import('../database/db');
-        const { tasks } = await import('../database/schema');
-        const { eq } = await import('drizzle-orm');
-
-        const db = await getDatabase();
-        let query = db.select().from(tasks);
-
-        if (args.status && args.status !== 'all') {
-          query = query.where(eq(tasks.status, args.status)) as any;
-        }
-
-        let result = await query;
-
-        if (args.keyword) {
-          const keyword = args.keyword.toLowerCase();
-          result = result.filter(t => t.title.toLowerCase().includes(keyword));
-        }
-
-        const taskList = result.map(t => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          priority: t.priority,
-          dueDate: t.dueDate,
-          dueTime: t.dueTime,
-        }));
-
-        assistantText += `\n\n找到 ${taskList.length} 个任务：\n${taskList.map(t => `- ${t.title} (ID: ${t.id}, 状态: ${t.status})`).join('\n')}`;
-      } else if (toolCall.name === 'create_tasks') {
-        draftActions.push({
-          type: 'create_task',
-          payload: args.tasks,
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(toolResult),
         });
-      } else if (toolCall.name === 'update_tasks') {
-        draftActions.push({
-          type: 'update_task',
-          payload: args.updates,
-        });
-      } else if (toolCall.name === 'schedule_tasks') {
-        draftActions.push({
-          type: 'schedule_task',
-          payload: args.schedules,
-        });
-      } else if (toolCall.name === 'update_user_profile') {
-        await saveUserProfileSettings(args);
-        draftActions.push({
-          type: 'update_profile',
-          payload: args,
+      } catch (e) {
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify({ success: false, error: String(e) }),
         });
       }
-    } catch (e) {
-      console.error('Failed to parse tool call arguments:', e);
     }
+
+    iterations++;
   }
 
   return {
     responseId: randomUUID(),
-    assistantText: assistantText || '已生成任务建议',
+    assistantText: '已达到最大迭代次数',
     draftActions,
-    thinking: thinking || undefined,
-    toolCalls: completedToolCalls.length > 0 ? completedToolCalls : undefined,
+    toolCalls: allToolCalls,
   };
 }
 
