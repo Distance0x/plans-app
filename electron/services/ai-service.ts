@@ -32,6 +32,20 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'get_tasks',
+      description: '查询任务列表，用于在更新任务前获取任务ID',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['todo', 'in_progress', 'completed', 'all'], description: '任务状态筛选，默认 all' },
+          keyword: { type: 'string', description: '按标题关键词搜索' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'create_tasks',
       description: '创建一个或多个新任务',
       parameters: {
@@ -247,7 +261,36 @@ export async function chatAndPlan(
     try {
       const args = JSON.parse(toolCall.arguments);
 
-      if (toolCall.name === 'create_tasks') {
+      if (toolCall.name === 'get_tasks') {
+        const { getDatabase } = await import('../database/db');
+        const { tasks } = await import('../database/schema');
+        const { eq } = await import('drizzle-orm');
+
+        const db = await getDatabase();
+        let query = db.select().from(tasks);
+
+        if (args.status && args.status !== 'all') {
+          query = query.where(eq(tasks.status, args.status)) as any;
+        }
+
+        let result = await query;
+
+        if (args.keyword) {
+          const keyword = args.keyword.toLowerCase();
+          result = result.filter(t => t.title.toLowerCase().includes(keyword));
+        }
+
+        const taskList = result.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
+          dueTime: t.dueTime,
+        }));
+
+        assistantText += `\n\n找到 ${taskList.length} 个任务：\n${taskList.map(t => `- ${t.title} (ID: ${t.id}, 状态: ${t.status})`).join('\n')}`;
+      } else if (toolCall.name === 'create_tasks') {
         draftActions.push({
           type: 'create_task',
           payload: args.tasks,

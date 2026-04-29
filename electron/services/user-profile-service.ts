@@ -74,7 +74,12 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
    - 工作任务：工作时间内（9:00-18:00）
    - 生活任务：工作时间外（18:00-22:00）
    - 紧急任务：当天或明天
-   - 普通任务：未来 1-3 天内`;
+   - 普通任务：未来 1-3 天内
+
+**工具使用规则**：
+- 更新任务前，必须先调用 get_tasks 工具查询任务列表获取任务ID
+- 不要要求用户提供任务ID，你可以通过 get_tasks 工具主动查询
+- 如果用户说"修改某某任务"，先用 get_tasks 搜索该任务，然后用 update_tasks 更新`;
 
   if (!profileContext) {
     return basePrompt;
