@@ -25,6 +25,7 @@ export function AgentPanel() {
     pendingToolCalls,
     draftActions,
     addMessage,
+    loadMessages,
     deleteMessage,
     setLoading,
     setStreamingThinking,
@@ -93,17 +94,7 @@ export function AgentPanel() {
     try {
       const history = await window.electron.ai.messages.load(currentSessionId);
       if (history && history.length > 0) {
-        history.forEach((msg: any) => {
-          addMessage({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-            thinking: msg.thinking,
-            toolCalls: msg.toolCalls,
-            draftActions: msg.draftActions,
-            timestamp: msg.timestamp,
-          });
-        });
+        loadMessages(history);
       }
     } catch (error) {
       console.error('Failed to load history:', error);
@@ -193,6 +184,7 @@ export function AgentPanel() {
     setInputValue('');
     setStreamingThinking('');
     setPendingToolCalls([]);
+    setStreamingMessage('');
 
     try {
       const response = await window.electron.ai.chat(message, currentSessionId);

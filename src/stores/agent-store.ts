@@ -39,6 +39,7 @@ interface AgentState {
   draftActions: DraftAction[];
 
   addMessage: (message: Message) => void;
+  loadMessages: (messages: Message[]) => void;
   deleteMessage: (messageId: string) => void;
   setLoading: (loading: boolean) => void;
   setStreamingThinking: (thinking: string) => void;
@@ -85,6 +86,9 @@ export const useAgentStore = create<AgentState>((set) => ({
         ),
       };
     }),
+
+  loadMessages: (messages) =>
+    set({ messages }),
 
   deleteMessage: (messageId) =>
     set((state) => {
