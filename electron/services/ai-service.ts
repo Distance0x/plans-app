@@ -21,6 +21,8 @@ interface ToolCallInfo {
   name: string;
   arguments: string;
   status: 'pending' | 'completed' | 'failed';
+  startTime?: number;
+  endTime?: number;
 }
 
 interface DraftAction {
@@ -233,14 +235,14 @@ export async function chatAndPlan(
     for (const toolCall of message.tool_calls) {
       if (toolCall.type !== 'function') continue;
 
+      const startTime = Date.now();
       const toolInfo: ToolCallInfo = {
         id: toolCall.id,
         name: toolCall.function.name,
         arguments: toolCall.function.arguments,
         status: 'completed',
+        startTime,
       };
-      allToolCalls.push(toolInfo);
-      onStream?.({ toolCalls: allToolCalls });
 
       try {
         const args = JSON.parse(toolCall.function.arguments);
@@ -300,12 +302,21 @@ export async function chatAndPlan(
           toolResult = { success: true, message: '用户画像已更新' };
         }
 
+        toolInfo.endTime = Date.now();
+        allToolCalls.push(toolInfo);
+        onStream?.({ toolCalls: allToolCalls });
+
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
           content: JSON.stringify(toolResult),
         });
       } catch (e) {
+        toolInfo.status = 'failed';
+        toolInfo.endTime = Date.now();
+        allToolCalls.push(toolInfo);
+        onStream?.({ toolCalls: allToolCalls });
+
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
