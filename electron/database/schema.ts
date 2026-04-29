@@ -9,8 +9,6 @@ export const tasks = sqliteTable('tasks', {
   dueDate: text('due_date'),
   dueTime: text('due_time'),
   duration: integer('duration').default(60),
-  scheduledStartTime: text('scheduled_start_time'),
-  scheduledEndTime: text('scheduled_end_time'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   completedAt: text('completed_at'),
