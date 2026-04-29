@@ -579,10 +579,24 @@ export function AgentPanel() {
                           dueDate?: string;
                           dueTime?: string;
                           duration?: number;
+                          scheduledStartTime?: string;
+                          scheduledEndTime?: string;
                         }>;
                         for (const update of updates) {
                           const { taskId, ...fields } = update;
                           await updateTask(taskId, fields);
+                        }
+                      } else if (action.type === 'schedule_task') {
+                        const schedules = action.payload as Array<{
+                          taskId: string;
+                          startTime: string;
+                          endTime: string;
+                        }>;
+                        for (const schedule of schedules) {
+                          await updateTask(schedule.taskId, {
+                            scheduledStartTime: schedule.startTime,
+                            scheduledEndTime: schedule.endTime,
+                          });
                         }
                       }
                     }

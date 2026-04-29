@@ -103,6 +103,8 @@ export function TaskForm({ taskId, parentId, onClose, initialData }: TaskFormPro
     dueDate: initialData?.dueDate || existingTask?.dueDate || '',
     dueTime: initialData?.dueTime || existingTask?.dueTime || '',
     duration: String(initialData?.duration || existingTask?.duration || 60),
+    scheduledStartTime: existingTask?.scheduledStartTime || '',
+    scheduledEndTime: existingTask?.scheduledEndTime || '',
     listId: existingTask?.listId || 'inbox',
     tagIds: existingTagIds,
     newTagName: '',
@@ -206,6 +208,8 @@ export function TaskForm({ taskId, parentId, onClose, initialData }: TaskFormPro
       dueDate: formData.dueDate,
       dueTime: formData.dueTime,
       duration: Number(formData.duration) || 60,
+      scheduledStartTime: formData.scheduledStartTime || undefined,
+      scheduledEndTime: formData.scheduledEndTime || undefined,
       listId: formData.listId || 'inbox',
       tagIds: formData.tagIds,
       notes: formData.notes.trim(),
@@ -360,6 +364,21 @@ export function TaskForm({ taskId, parentId, onClose, initialData }: TaskFormPro
               type="time"
               value={formData.dueTime}
               onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="开始时间"
+              type="datetime-local"
+              value={formData.scheduledStartTime}
+              onChange={(e) => setFormData({ ...formData, scheduledStartTime: e.target.value })}
+            />
+            <Input
+              label="结束时间"
+              type="datetime-local"
+              value={formData.scheduledEndTime}
+              onChange={(e) => setFormData({ ...formData, scheduledEndTime: e.target.value })}
             />
           </div>
 

@@ -20,6 +20,8 @@ export interface Task {
   dueDate?: string;
   dueTime?: string;
   duration?: number;
+  scheduledStartTime?: string;
+  scheduledEndTime?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
