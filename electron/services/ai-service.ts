@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { loadAIConfig } from './keyvault';
 import { randomUUID } from 'crypto';
 import { getUserProfileContext, buildAISystemPrompt } from './user-profile-service';
+import { saveUserProfileSettings } from './user-profile-update';
 
 interface ChatRequest {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -23,7 +24,7 @@ interface ToolCallInfo {
 }
 
 interface DraftAction {
-  type: 'create_task' | 'update_task' | 'schedule_task';
+  type: 'create_task' | 'update_task' | 'schedule_task' | 'update_profile';
   payload: unknown;
 }
 
@@ -109,6 +110,50 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'update_user_profile',
+      description: '更新用户画像设置（工作时间、分类规则、优先级规则）',
+      parameters: {
+        type: 'object',
+        properties: {
+          timeMap: {
+            type: 'object',
+            properties: {
+              workdays: {
+                type: 'object',
+                properties: {
+                  start: { type: 'string', description: 'HH:mm' },
+                  end: { type: 'string', description: 'HH:mm' }
+                }
+              },
+              weeklyExceptions: {
+                type: 'object',
+                description: '特定日期的例外时间'
+              }
+            }
+          },
+          classificationRules: {
+            type: 'object',
+            properties: {
+              workKeywords: { type: 'array', items: { type: 'string' } },
+              personalKeywords: { type: 'array', items: { type: 'string' } },
+              projectPatterns: { type: 'array', items: { type: 'string' } }
+            }
+          },
+          priorityRules: {
+            type: 'object',
+            properties: {
+              hasDeadline: { type: 'string', enum: ['high'] },
+              dailyRoutine: { type: 'string', enum: ['medium', 'low'] },
+              urgentKeywords: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        }
+      }
+    }
+  }
 ];
 
 export async function chatAndPlan(
@@ -216,6 +261,12 @@ export async function chatAndPlan(
         draftActions.push({
           type: 'schedule_task',
           payload: args.schedules,
+        });
+      } else if (toolCall.name === 'update_user_profile') {
+        await saveUserProfileSettings(args);
+        draftActions.push({
+          type: 'update_profile',
+          payload: args,
         });
       }
     } catch (e) {

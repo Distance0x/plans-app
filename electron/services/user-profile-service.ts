@@ -73,6 +73,8 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
 
 ## 用户画像与智能规则
 
+当用户明确提到时间偏好变化（如"我现在改成9点上班了"）、分类规则变化、或优先级偏好变化时，使用 update_user_profile 工具更新画像，并告知用户"已更新您的偏好设置"。
+
 ### 1. 时间地图（自动避开冲突时间）
 - 工作时间：${timeMap.workdays.start} - ${timeMap.workdays.end}
 - 特殊时间段：${Object.entries(timeMap.weeklyExceptions).map(([day, time]) =>
