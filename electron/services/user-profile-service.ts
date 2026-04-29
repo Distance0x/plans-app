@@ -61,11 +61,16 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
 
 当前日期时间：${currentDate} ${currentTime}
 
-**重要规则**：
+**核心规则**：
 1. 当用户提到"明天"、"后天"、"下周"等相对时间时，必须根据当前日期计算具体日期
-2. 创建任务时，必须为每个任务设置 dueDate（YYYY-MM-DD 格式）
-3. 如果用户提到具体时间（如"晚上"、"19点"），必须设置 dueTime（HH:mm 格式）
-4. 如果用户没有明确时间，根据任务性质推测合理时间：
+2. 创建多个任务时，必须按时间顺序编排，不能所有任务设置相同的 dueTime
+3. 每个任务必须设置 dueDate（YYYY-MM-DD 格式）和 dueTime（HH:mm 格式）
+4. 任务编排规则：
+   - 第一个任务：从当前时间或用户指定时间开始
+   - 后续任务：前一个任务结束时间 = 下一个任务开始时间
+   - 计算公式：下一个任务 dueTime = 上一个任务 dueTime + 上一个任务 duration
+   - 示例：任务1(20:00, 60分钟) → 任务2(21:00, 30分钟) → 任务3(21:30, 60分钟)
+5. 如果用户没有明确时间，根据任务性质推测：
    - 工作任务：工作时间内（9:00-18:00）
    - 生活任务：工作时间外（18:00-22:00）
    - 紧急任务：当天或明天
@@ -125,17 +130,17 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
    - "给车充电" → 普通（日常事务）
    - "洗衣服" → 普通（日常事务）
    - "写文章" → 普通（无紧急关键词）
-4. **必须自动安排时间**：
+4. **必须按时间顺序编排任务**：
    - 当前时间：${currentTime}
    - 避开工作时间（${timeMap.workdays.start}-${timeMap.workdays.end}）
    - "晚上回来" → 推测为 19:00 后
-   - 按顺序安排：
-     * 充电：dueDate="${currentDate}", dueTime="19:00", duration=30
-     * 洗衣服：dueDate="${currentDate}", dueTime="19:30", duration=30
-     * 写文章：dueDate="${currentDate}", dueTime="20:00", duration=90
+   - **严格按顺序编排，不能所有任务设置相同时间**：
+     * 任务1 充电：dueDate="${currentDate}", dueTime="19:00", duration=30
+     * 任务2 洗衣服：dueDate="${currentDate}", dueTime="19:30", duration=30（19:00+30分钟）
+     * 任务3 写文章：dueDate="${currentDate}", dueTime="20:00", duration=90（19:30+30分钟）
 
-**重要**：
-- 每个任务必须有 dueDate 和 dueTime
-- 基于当前时间（${currentTime}）和用户画像做出智能决策
-- 减少用户手动操作`;
+**关键**：
+- 每个任务的 dueTime 必须不同
+- 后一个任务的开始时间 = 前一个任务的结束时间
+- 基于当前时间（${currentTime}）和用户画像做出智能决策`;
 }

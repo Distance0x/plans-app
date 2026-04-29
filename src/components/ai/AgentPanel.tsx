@@ -68,6 +68,7 @@ export function AgentPanel() {
 
   useEffect(() => {
     loadConfig();
+    loadHistoryMessages();
 
     const handleStream = (chunk: { thinking?: string; toolCalls?: any[]; content?: string }) => {
       if (chunk.thinking) {
@@ -87,6 +88,27 @@ export function AgentPanel() {
       window.electron.off('ai:stream', handleStream);
     };
   }, [setStreamingThinking, setPendingToolCalls]);
+
+  const loadHistoryMessages = async () => {
+    try {
+      const history = await window.electron.ai.messages.load(currentSessionId);
+      if (history && history.length > 0) {
+        history.forEach((msg: any) => {
+          addMessage({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            thinking: msg.thinking,
+            toolCalls: msg.toolCalls,
+            draftActions: msg.draftActions,
+            timestamp: msg.timestamp,
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    }
+  };
 
   const loadConfig = async () => {
     try {
