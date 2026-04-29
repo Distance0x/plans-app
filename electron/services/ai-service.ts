@@ -204,7 +204,7 @@ export async function chatAndPlan(
     ...request.messages,
   ];
 
-  const MAX_ITERATIONS = 5;
+  const MAX_ITERATIONS = 10;
   let iterations = 0;
   const allToolCalls: ToolCallInfo[] = [];
   const draftActions: DraftAction[] = [];

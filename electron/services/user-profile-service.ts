@@ -79,7 +79,12 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
 **工具使用规则**：
 - 更新任务前，必须先调用 get_tasks 工具查询任务列表获取任务ID
 - 不要要求用户提供任务ID，你可以通过 get_tasks 工具主动查询
-- 如果用户说"修改某某任务"，先用 get_tasks 搜索该任务，然后用 update_tasks 更新`;
+- 如果用户说"修改某某任务"，先用 get_tasks 搜索该任务，然后用 update_tasks 更新
+
+**重要区分**：
+- **duration 字段**：任务本身需要的时长（分钟）。用户说"这个任务要两个小时"，就是修改 duration=120
+- **schedule_tasks 工具**：为任务安排具体时间块（startTime 到 endTime）。只有用户明确说"安排在某时间段"才用这个工具
+- **修改时长 ≠ 修改时间安排**：用户说"改成两小时"，用 update_tasks 改 duration；用户说"改到晚上8点"，用 schedule_tasks`;
 
   if (!profileContext) {
     return basePrompt;
