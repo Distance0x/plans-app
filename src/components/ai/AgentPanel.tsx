@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Bubble, Sender } from '@ant-design/x';
 import { UserOutlined, RobotOutlined, SettingOutlined, PlusOutlined, DeleteOutlined, ClearOutlined, EditOutlined } from '@ant-design/icons';
-import { Select, Tag, Card, Button, Popconfirm } from 'antd';
+import { Select, Card, Button, Popconfirm } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTaskStore } from '../../stores/task-store';
 import { TaskForm } from '../tasks/TaskForm';
+import { ThinkingIndicator } from './ThinkingIndicator';
+import { ToolCallCard } from './ToolCallCard';
 
 interface AIConfig {
   baseURL: string;
@@ -378,21 +380,11 @@ export function AgentPanel() {
               }
               content={
                 <div>
-                  {msg.thinking && (
-                    <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-gray-600 dark:text-gray-400">
-                      <div className="font-semibold mb-1">💭 思考过程：</div>
-                      <div className="whitespace-pre-wrap">{msg.thinking}</div>
-                    </div>
-                  )}
+                  <ThinkingIndicator thinking={msg.thinking} />
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-1">
+                    <div className="mb-2 space-y-1">
                       {msg.toolCalls.map((tool) => (
-                        <Tag
-                          key={tool.id}
-                          color={tool.status === 'completed' ? 'green' : tool.status === 'failed' ? 'red' : 'blue'}
-                        >
-                          🔧 {tool.name}
-                        </Tag>
+                        <ToolCallCard key={tool.id} toolCall={tool} />
                       ))}
                     </div>
                   )}
@@ -503,18 +495,11 @@ export function AgentPanel() {
             }
             content={
               <div>
-                {streamingThinking && (
-                  <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-gray-600 dark:text-gray-400">
-                    <div className="font-semibold mb-1">💭 思考中...</div>
-                    <div className="whitespace-pre-wrap">{streamingThinking}</div>
-                  </div>
-                )}
+                <ThinkingIndicator thinking={streamingThinking} />
                 {pendingToolCalls.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1">
+                  <div className="mb-2 space-y-1">
                     {pendingToolCalls.map((tool) => (
-                      <Tag key={tool.id} color="processing">
-                        🔧 {tool.name}
-                      </Tag>
+                      <ToolCallCard key={tool.id} toolCall={tool} />
                     ))}
                   </div>
                 )}
