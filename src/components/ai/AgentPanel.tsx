@@ -3,6 +3,7 @@ import { Bubble, Sender } from '@ant-design/x';
 import { UserOutlined, RobotOutlined, SettingOutlined, PlusOutlined, DeleteOutlined, ClearOutlined, EditOutlined } from '@ant-design/icons';
 import { Select, Card, Button, Popconfirm } from 'antd';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTaskStore } from '../../stores/task-store';
 import { TaskForm } from '../tasks/TaskForm';
@@ -397,7 +398,7 @@ export function AgentPanel() {
                     </div>
                   )}
                   <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                   </div>
                   {msg.draftActions && msg.draftActions.length > 0 && msg.draftActions[0].type === 'create_task' && (
                     <div className="mt-2 space-y-2">
