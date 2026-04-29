@@ -512,7 +512,6 @@ export function AgentPanel() {
                 </div>
               </div>
             }
-            loading
           />
         )}
       </div>
@@ -539,6 +538,7 @@ export function AgentPanel() {
                   setApplyingDraft(true);
                   try {
                     await window.electron.snapshot.create('ai_agent');
+                    const newApplied = new Set(appliedMessages);
                     for (const action of draftActions) {
                       if (action.type === 'create_task') {
                         const tasks = action.payload as Array<{
@@ -549,7 +549,8 @@ export function AgentPanel() {
                           dueTime?: string;
                           duration?: number;
                         }>;
-                        for (const task of tasks) {
+                        for (let idx = 0; idx < tasks.length; idx++) {
+                          const task = tasks[idx];
                           await createTask({
                             title: task.title,
                             description: task.description,
@@ -558,9 +559,14 @@ export function AgentPanel() {
                             dueTime: task.dueTime,
                             duration: task.duration || 60,
                           });
+                          const lastMsg = messages[messages.length - 1];
+                          if (lastMsg?.role === 'assistant') {
+                            newApplied.add(`${lastMsg.id}-${idx}`);
+                          }
                         }
                       }
                     }
+                    setAppliedMessages(newApplied);
                     clearDraft();
                   } finally {
                     setApplyingDraft(false);

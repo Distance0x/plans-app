@@ -61,7 +61,15 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
 
 当前日期时间：${currentDate} ${currentTime}
 
-当用户提到"明天"、"后天"、"下周"等相对时间时，请根据当前日期自动计算具体日期。`;
+**重要规则**：
+1. 当用户提到"明天"、"后天"、"下周"等相对时间时，必须根据当前日期计算具体日期
+2. 创建任务时，必须为每个任务设置 dueDate（YYYY-MM-DD 格式）
+3. 如果用户提到具体时间（如"晚上"、"19点"），必须设置 dueTime（HH:mm 格式）
+4. 如果用户没有明确时间，根据任务性质推测合理时间：
+   - 工作任务：工作时间内（9:00-18:00）
+   - 生活任务：工作时间外（18:00-22:00）
+   - 紧急任务：当天或明天
+   - 普通任务：未来 1-3 天内`;
 
   if (!profileContext) {
     return basePrompt;
@@ -117,10 +125,17 @@ export function buildAISystemPrompt(profileContext: UserProfileContext | null, c
    - "给车充电" → 普通（日常事务）
    - "洗衣服" → 普通（日常事务）
    - "写文章" → 普通（无紧急关键词）
-4. 自动安排时间：
+4. **必须自动安排时间**：
+   - 当前时间：${currentTime}
    - 避开工作时间（${timeMap.workdays.start}-${timeMap.workdays.end}）
    - "晚上回来" → 推测为 19:00 后
-   - 按顺序安排：充电 19:00-19:30，洗衣服 19:30-20:00，写文章 20:00-21:30
+   - 按顺序安排：
+     * 充电：dueDate="${currentDate}", dueTime="19:00", duration=30
+     * 洗衣服：dueDate="${currentDate}", dueTime="19:30", duration=30
+     * 写文章：dueDate="${currentDate}", dueTime="20:00", duration=90
 
-**重要**：始终基于用户画像做出智能决策，减少用户手动操作。`;
+**重要**：
+- 每个任务必须有 dueDate 和 dueTime
+- 基于当前时间（${currentTime}）和用户画像做出智能决策
+- 减少用户手动操作`;
 }
