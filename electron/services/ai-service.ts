@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { loadAIConfig } from './keyvault';
 import { randomUUID } from 'crypto';
+import { getUserProfileContext, buildAISystemPrompt } from './user-profile-service';
 
 interface ChatRequest {
   userText: string;
@@ -130,14 +131,13 @@ export async function chatAndPlan(
   const currentDate = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const currentTime = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
+  const profileContext = await getUserProfileContext();
+  const systemPrompt = buildAISystemPrompt(profileContext, currentDate, currentTime);
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: 'system',
-      content: `你是一个任务管理助手。帮助用户创建、更新和安排任务。使用提供的工具来操作任务。
-
-当前日期时间：${currentDate} ${currentTime}
-
-当用户提到"明天"、"后天"、"下周"等相对时间时，请根据当前日期自动计算具体日期。`,
+      content: systemPrompt,
     },
     {
       role: 'user',

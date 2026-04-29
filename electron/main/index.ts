@@ -8,6 +8,7 @@ import { registerOrganizationHandlers } from '../ipc/organization-handler';
 import { registerAIHandlers } from '../ipc/ai-handler';
 import { registerSnapshotHandlers } from '../ipc/snapshot-handler';
 import { registerRecommendationHandlers } from '../ipc/recommendation-handler';
+import { registerUserProfileHandlers } from '../ipc/user-profile-handler';
 import { initReminderEngine, registerReminderHandlers, stopReminderEngine } from '../services/reminder-engine';
 import { initNotificationService } from '../services/notification-service';
 import { createAppTray } from '../utils/tray';
@@ -140,6 +141,7 @@ app.whenReady().then(async () => {
   registerAIHandlers();
   registerSnapshotHandlers();
   registerRecommendationHandlers();
+  registerUserProfileHandlers();
 
   // 注册窗口控制处理器
   ipcMain.on('window:minimize', () => {

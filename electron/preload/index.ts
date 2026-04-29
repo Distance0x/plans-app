@@ -120,6 +120,11 @@ contextBridge.exposeInMainWorld('electron', {
     profile: () => ipcRenderer.invoke('recommendation:profile'),
   },
 
+  userProfile: {
+    getSettings: () => ipcRenderer.invoke('userProfile:getSettings'),
+    saveSettings: (settings: any) => ipcRenderer.invoke('userProfile:saveSettings', settings),
+  },
+
   // 事件监听
   on: (channel: string, callback: (...args: any[]) => void) => {
     const wrapped = (_: IpcRendererEvent, ...args: any[]) => callback(...args);

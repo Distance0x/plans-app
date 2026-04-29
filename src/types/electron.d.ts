@@ -171,6 +171,44 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+  userProfile: {
+    getSettings: () => Promise<{
+      success: boolean;
+      settings?: {
+        timeMap: {
+          workdays: { start: string; end: string };
+          weeklyExceptions: Record<string, { start: string; end: string; note?: string }>;
+        };
+        classificationRules: {
+          workKeywords: string[];
+          personalKeywords: string[];
+          projectPatterns: string[];
+        };
+        priorityRules: {
+          hasDeadline: 'high';
+          dailyRoutine: 'medium' | 'low';
+          urgentKeywords: string[];
+        };
+      } | null;
+      error?: string;
+    }>;
+    saveSettings: (settings: {
+      timeMap: {
+        workdays: { start: string; end: string };
+        weeklyExceptions: Record<string, { start: string; end: string; note?: string }>;
+      };
+      classificationRules: {
+        workKeywords: string[];
+        personalKeywords: string[];
+        projectPatterns: string[];
+      };
+      priorityRules: {
+        hasDeadline: 'high';
+        dailyRoutine: 'medium' | 'low';
+        urgentKeywords: string[];
+      };
+    }) => Promise<{ success: boolean; error?: string }>;
+  };
   on: (channel: string, callback: (...args: any[]) => void) => void;
   off: (channel: string, callback: (...args: any[]) => void) => void;
 }
