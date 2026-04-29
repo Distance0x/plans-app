@@ -36,7 +36,7 @@ export function AgentPanel() {
     switchSession,
     clearCurrentSession,
   } = useAgentStore();
-  const { createTask } = useTaskStore();
+  const { createTask, updateTask } = useTaskStore();
 
   const [isConfigured, setIsConfigured] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -567,6 +567,21 @@ export function AgentPanel() {
                           if (lastMsg?.role === 'assistant') {
                             newApplied.add(`${lastMsg.id}-${idx}`);
                           }
+                        }
+                      } else if (action.type === 'update_task') {
+                        const updates = action.payload as Array<{
+                          taskId: string;
+                          title?: string;
+                          description?: string;
+                          priority?: 'high' | 'medium' | 'low';
+                          status?: 'todo' | 'in_progress' | 'completed';
+                          dueDate?: string;
+                          dueTime?: string;
+                          duration?: number;
+                        }>;
+                        for (const update of updates) {
+                          const { taskId, ...fields } = update;
+                          await updateTask(taskId, fields);
                         }
                       }
                     }
