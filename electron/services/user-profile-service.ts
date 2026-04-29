@@ -1,6 +1,5 @@
 import { getDatabase } from '../database/db';
 import { userTimePreferences, userBehaviorStats } from '../database/schema';
-import { eq } from 'drizzle-orm';
 
 export interface UserProfileContext {
   timeMap: {
@@ -25,7 +24,7 @@ export async function getUserProfileContext(): Promise<UserProfileContext | null
   const db = await getDatabase();
 
   const timePrefs = await db.select().from(userTimePreferences).limit(1);
-  const behaviorStats = await db.select().from(userBehaviorStats)
+  await db.select().from(userBehaviorStats)
     .orderBy(userBehaviorStats.date)
     .limit(7);
 

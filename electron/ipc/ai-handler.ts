@@ -7,14 +7,26 @@ import { aiMessages } from '../database/schema';
 import { eq } from 'drizzle-orm';
 
 export function registerAIHandlers() {
-  ipcMain.handle('ai:chat', async (event, userText: string, threadId?: string) => {
+  ipcMain.handle('ai:chat', async (event, userText: string, sessionId?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
 
-    const response = await chatAndPlan({ userText, threadId }, (chunk) => {
+    const db = await getDatabase();
+    const history = sessionId
+      ? await db.select().from(aiMessages)
+          .where(eq(aiMessages.sessionId, sessionId))
+          .orderBy(aiMessages.timestamp)
+      : [];
+
+    const messages = history.map(msg => ({
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content
+    }));
+    messages.push({ role: 'user', content: userText });
+
+    const response = await chatAndPlan({ messages }, (chunk) => {
       win?.webContents.send('ai:stream', chunk);
     });
 
-    // 追踪 AI 对话
     const tasksGenerated = response.draftActions.filter(a => a.type === 'create_task').length;
     await behaviorTracker.trackAIConversation(tasksGenerated);
 

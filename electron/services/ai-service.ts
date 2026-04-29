@@ -4,8 +4,7 @@ import { randomUUID } from 'crypto';
 import { getUserProfileContext, buildAISystemPrompt } from './user-profile-service';
 
 interface ChatRequest {
-  userText: string;
-  threadId?: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 interface ChatResponse {
@@ -139,10 +138,7 @@ export async function chatAndPlan(
       role: 'system',
       content: systemPrompt,
     },
-    {
-      role: 'user',
-      content: request.userText,
-    },
+    ...request.messages,
   ];
 
   const stream = await client.chat.completions.create({

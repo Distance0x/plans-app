@@ -58,6 +58,7 @@ export function AgentPanel() {
     dueTime?: string;
     duration?: number;
   } | null>(null);
+  const [streamingMessage, setStreamingMessage] = useState<string>('');
 
   useEffect(() => {
     localStorage.setItem('ai-applied-messages', JSON.stringify([...appliedMessages]));
@@ -72,6 +73,9 @@ export function AgentPanel() {
       }
       if (chunk.toolCalls) {
         setPendingToolCalls(chunk.toolCalls);
+      }
+      if (chunk.content) {
+        setStreamingMessage(prev => prev + chunk.content);
       }
     };
 
@@ -167,7 +171,7 @@ export function AgentPanel() {
     setPendingToolCalls([]);
 
     try {
-      const response = await window.electron.ai.chat(message);
+      const response = await window.electron.ai.chat(message, currentSessionId);
       addMessage({
         id: `msg_${Date.now()}`,
         role: 'assistant',
@@ -189,6 +193,7 @@ export function AgentPanel() {
       setLoading(false);
       setStreamingThinking('');
       setPendingToolCalls([]);
+      setStreamingMessage('');
     }
   };
 
@@ -513,7 +518,13 @@ export function AgentPanel() {
                     ))}
                   </div>
                 )}
-                <div>正在思考...</div>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  {streamingMessage ? (
+                    <ReactMarkdown>{streamingMessage}</ReactMarkdown>
+                  ) : (
+                    <span>正在思考...</span>
+                  )}
+                </div>
               </div>
             }
             loading

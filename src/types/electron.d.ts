@@ -74,7 +74,7 @@ export interface ElectronAPI {
     openAttachment: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
   };
   ai: {
-    chat: (userText: string, threadId?: string) => Promise<{
+    chat: (userText: string, sessionId?: string) => Promise<{
       responseId: string;
       assistantText: string;
       draftActions: Array<{
