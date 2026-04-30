@@ -220,6 +220,7 @@ export async function chatAndPlan(
   let iterations = 0;
   const allToolCalls: ToolCallInfo[] = [];
   const draftActions: DraftAction[] = [];
+  let lastThinking = '';
 
   while (iterations < MAX_ITERATIONS) {
     throwIfAborted(request.signal);
@@ -234,11 +235,17 @@ export async function chatAndPlan(
     });
 
     let fullContent = '';
+    let fullThinking = '';
     let toolCalls: any[] = [];
 
     for await (const chunk of stream) {
       throwIfAborted(request.signal);
-      const delta = chunk.choices[0]?.delta;
+      const delta = chunk.choices[0]?.delta as any;
+
+      if (delta?.reasoning_content) {
+        fullThinking += delta.reasoning_content;
+        onStream?.({ thinking: delta.reasoning_content });
+      }
 
       if (delta?.content) {
         fullContent += delta.content;
@@ -264,11 +271,16 @@ export async function chatAndPlan(
       }
     }
 
+    if (fullThinking) {
+      lastThinking = fullThinking;
+    }
+
     if (toolCalls.length === 0) {
       throwIfAborted(request.signal);
       return {
         responseId: randomUUID(),
         assistantText: fullContent || '已完成',
+        thinking: fullThinking || undefined,
         draftActions,
         toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
       };
@@ -277,8 +289,9 @@ export async function chatAndPlan(
     messages.push({
       role: 'assistant',
       content: fullContent || null,
+      reasoning_content: fullThinking || undefined,
       tool_calls: toolCalls,
-    });
+    } as any);
 
     for (const toolCall of toolCalls) {
       throwIfAborted(request.signal);
@@ -380,6 +393,7 @@ export async function chatAndPlan(
   return {
     responseId: randomUUID(),
     assistantText: '已达到最大迭代次数',
+    thinking: lastThinking || undefined,
     draftActions,
     toolCalls: allToolCalls,
   };

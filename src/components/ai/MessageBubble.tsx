@@ -63,7 +63,7 @@ export function MessageBubble({
       </div>
 
       <div className={`flex-1 max-w-[80%] ${role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-2`}>
-        {thinking && <ThinkingIndicator thinking={thinking} />}
+        {thinking && <ThinkingIndicator thinking={thinking} isStreaming={isStreaming} />}
 
         {toolCalls && toolCalls.length > 0 && (
           <div className="space-y-1 w-full">

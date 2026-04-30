@@ -5,9 +5,10 @@ import { Card, Space } from 'antd';
 interface ThinkingIndicatorProps {
   thinking?: string;
   expanded?: boolean;
+  isStreaming?: boolean;
 }
 
-export function ThinkingIndicator({ thinking, expanded = false }: ThinkingIndicatorProps) {
+export function ThinkingIndicator({ thinking, expanded = false, isStreaming = false }: ThinkingIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(expanded);
 
   if (!thinking) return null;
@@ -26,8 +27,8 @@ export function ThinkingIndicator({ thinking, expanded = false }: ThinkingIndica
       <Space direction="vertical" style={{ width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Space>
-            <BulbOutlined spin />
-            <span style={{ fontWeight: 500 }}>正在思考...</span>
+            <BulbOutlined spin={isStreaming} />
+            <span style={{ fontWeight: 500 }}>{isStreaming ? '正在思考...' : '思考过程'}</span>
           </Space>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
