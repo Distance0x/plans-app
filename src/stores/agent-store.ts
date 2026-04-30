@@ -37,6 +37,7 @@ interface AgentState {
   streamingThinking: string;
   pendingToolCalls: ToolCall[];
   draftActions: DraftAction[];
+  showThinking: boolean;
 
   addMessage: (message: Message) => void;
   loadMessages: (messages: Message[]) => void;
@@ -46,6 +47,7 @@ interface AgentState {
   setPendingToolCalls: (toolCalls: ToolCall[]) => void;
   setDraftActions: (actions: DraftAction[]) => void;
   clearDraft: () => void;
+  setShowThinking: (show: boolean) => void;
 
   createSession: (title?: string) => string;
   switchSession: (sessionId: string) => void;
@@ -62,6 +64,14 @@ export const useAgentStore = create<AgentState>((set) => ({
   streamingThinking: '',
   pendingToolCalls: [],
   draftActions: [],
+  showThinking: (() => {
+    try {
+      const saved = localStorage.getItem('ai-show-thinking');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  })(),
 
   addMessage: (message) =>
     set((state) => {
@@ -110,6 +120,11 @@ export const useAgentStore = create<AgentState>((set) => ({
   setDraftActions: (actions) => set({ draftActions: actions }),
 
   clearDraft: () => set({ draftActions: [] }),
+
+  setShowThinking: (show) => {
+    localStorage.setItem('ai-show-thinking', JSON.stringify(show));
+    set({ showThinking: show });
+  },
 
   createSession: (title) => {
     const id = `session_${Date.now()}`;

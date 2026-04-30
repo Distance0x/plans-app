@@ -30,6 +30,7 @@ export function AgentPanel() {
     streamingThinking,
     pendingToolCalls,
     draftActions,
+    showThinking,
     addMessage,
     loadMessages,
     deleteMessage,
@@ -38,6 +39,7 @@ export function AgentPanel() {
     setPendingToolCalls,
     setDraftActions,
     clearDraft,
+    setShowThinking,
     createSession,
     switchSession,
     clearCurrentSession,
@@ -474,6 +476,19 @@ export function AgentPanel() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowThinking(!showThinking)}
+            className={`p-2 rounded-lg transition-colors ${
+              showThinking
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+            title={showThinking ? '隐藏思考过程' : '显示思考过程'}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </button>
+          <button
             onClick={() => createSession()}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             title="新建会话"
@@ -518,7 +533,7 @@ export function AgentPanel() {
             <MessageBubble
               role={msg.role}
               content={msg.content}
-              thinking={msg.thinking}
+              thinking={showThinking ? msg.thinking : undefined}
               toolCalls={msg.toolCalls}
               timestamp={msg.timestamp}
               onDelete={msg.role === 'assistant' ? () => deleteMessage(msg.id) : undefined}
@@ -594,7 +609,7 @@ export function AgentPanel() {
           <MessageBubble
             role="assistant"
             content={streamingContent || "正在处理..."}
-            thinking={streamingThinking}
+            thinking={showThinking ? streamingThinking : undefined}
             toolCalls={pendingToolCalls}
             isStreaming={true}
           />
