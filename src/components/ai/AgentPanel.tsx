@@ -1,14 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Bubble, Sender } from '@ant-design/x';
-import { UserOutlined, RobotOutlined, SettingOutlined, PlusOutlined, DeleteOutlined, ClearOutlined, EditOutlined } from '@ant-design/icons';
+import { useState, useEffect, useRef } from 'react';
+import { Sender } from '@ant-design/x';
+import { RobotOutlined, SettingOutlined, PlusOutlined, ClearOutlined, EditOutlined } from '@ant-design/icons';
 import { Select, Card, Button, Popconfirm } from 'antd';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTaskStore } from '../../stores/task-store';
 import { TaskForm } from '../tasks/TaskForm';
-import { ThinkingIndicator } from './ThinkingIndicator';
-import { ToolCallCard } from './ToolCallCard';
+import { MessageBubble } from './MessageBubble';
 
 interface AIConfig {
   baseURL: string;
@@ -46,6 +43,7 @@ export function AgentPanel() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [applyingDraft, setApplyingDraft] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
   const [appliedMessages, setAppliedMessages] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('ai-applied-messages');
@@ -77,6 +75,9 @@ export function AgentPanel() {
       }
       if (chunk.toolCalls) {
         setPendingToolCalls(chunk.toolCalls);
+      }
+      if (chunk.content) {
+        setStreamingContent(prev => prev + chunk.content);
       }
     };
 
@@ -181,9 +182,19 @@ export function AgentPanel() {
     setInputValue('');
     setStreamingThinking('');
     setPendingToolCalls([]);
+    setStreamingContent('');
 
     try {
       const response = await window.electron.ai.chat(message, currentSessionId);
+
+      // 关键：先设置 loading 为 false，让流式消息消失
+      setLoading(false);
+      setStreamingThinking('');
+      setPendingToolCalls([]);
+      setStreamingContent('');
+
+      // 然后再添加最终消息到历史
+      // 使用后端返回的 assistantText，不使用前端累积的 streamingContent
       addMessage({
         id: `msg_${Date.now()}`,
         role: 'assistant',
@@ -195,16 +206,17 @@ export function AgentPanel() {
       });
       setDraftActions(response.draftActions);
     } catch (error) {
+      setLoading(false);
+      setStreamingThinking('');
+      setPendingToolCalls([]);
+      setStreamingContent('');
+
       addMessage({
         id: `msg_${Date.now()}`,
         role: 'assistant',
         content: `错误: ${error instanceof Error ? error.message : '未知错误'}`,
         timestamp: Date.now(),
       });
-    } finally {
-      setLoading(false);
-      setStreamingThinking('');
-      setPendingToolCalls([]);
     }
   };
 
@@ -379,144 +391,89 @@ export function AgentPanel() {
         )}
 
         {messages.map((msg) => (
-          <div key={msg.id} className="relative group">
-            <Bubble
-              placement={msg.role === 'user' ? 'end' : 'start'}
-              avatar={
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-md">
-                  {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
-                </div>
-              }
-              content={
-                <div>
-                  <ThinkingIndicator thinking={msg.thinking} />
-                  {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div className="mb-2 space-y-1">
-                      {msg.toolCalls.map((tool) => (
-                        <ToolCallCard key={tool.id} toolCall={tool} />
-                      ))}
-                    </div>
-                  )}
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                  </div>
-                  {msg.draftActions && msg.draftActions.length > 0 && msg.draftActions[0].type === 'create_task' && (
-                    <div className="mt-2 space-y-2">
-                      {((msg.draftActions[0].payload as any[]) || []).map((task: any, idx: number) => (
-                        <Card
-                          key={idx}
-                          size="small"
-                          title={`📋 任务 ${idx + 1}: ${task.title}`}
-                          extra={
-                            appliedMessages.has(`${msg.id}-${idx}`) ? (
-                              <span className="text-sm text-green-600 font-medium">✓ 已创建</span>
-                            ) : (
-                              <div className="flex gap-2">
-                                <Button
-                                  size="small"
-                                  icon={<EditOutlined />}
-                                  onClick={() => {
-                                    setEditingTask(task);
-                                  }}
-                                >
-                                  修改
-                                </Button>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  onClick={async () => {
-                                    if (appliedMessages.has(`${msg.id}-${idx}`)) return;
-                                    setAppliedMessages(prev => new Set(prev).add(`${msg.id}-${idx}`));
-                                    try {
-                                      await createTask({
-                                        title: task.title,
-                                        description: task.description,
-                                        priority: task.priority || 'medium',
-                                        dueDate: task.dueDate,
-                                        dueTime: task.dueTime,
-                                        duration: task.duration || 60,
-                                      });
-                                    } catch (error) {
-                                      setAppliedMessages(prev => {
-                                        const next = new Set(prev);
-                                        next.delete(`${msg.id}-${idx}`);
-                                        return next;
-                                      });
-                                      throw error;
-                                    }
-                                  }}
-                                >
-                                  应用
-                                </Button>
-                              </div>
-                            )
-                          }
-                        >
-                          <div className="text-sm space-y-1">
-                            {task.description && <div className="text-gray-600 dark:text-gray-400">{task.description}</div>}
-                            <div className="flex gap-2 text-xs text-gray-500">
-                              {task.priority && <span>优先级: {task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}</span>}
-                              {task.dueDate && <span>截止: {task.dueDate} {task.dueTime || ''}</span>}
-                              {task.duration && <span>时长: {task.duration}分钟</span>}
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              }
-              styles={{
-                content: {
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    : 'rgba(255, 255, 255, 0.9)',
-                  color: msg.role === 'user' ? '#fff' : undefined,
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                }
-              }}
+          <div key={msg.id}>
+            <MessageBubble
+              role={msg.role}
+              content={msg.content}
+              thinking={msg.thinking}
+              toolCalls={msg.toolCalls}
+              timestamp={msg.timestamp}
+              onDelete={msg.role === 'assistant' ? () => deleteMessage(msg.id) : undefined}
             />
-            {msg.role === 'assistant' && (
-              <Popconfirm
-                title="确定删除此消息？"
-                onConfirm={() => deleteMessage(msg.id)}
-                okText="确定"
-                cancelText="取消"
-              >
-                <button
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-opacity"
-                >
-                  <DeleteOutlined style={{ fontSize: 14 }} />
-                </button>
-              </Popconfirm>
+            {msg.draftActions && msg.draftActions.length > 0 && msg.draftActions[0].type === 'create_task' && (
+              <div className="mt-2 ml-11 space-y-2">
+                {((msg.draftActions[0].payload as any[]) || []).map((task: any, idx: number) => (
+                  <Card
+                    key={idx}
+                    size="small"
+                    title={`📋 任务 ${idx + 1}: ${task.title}`}
+                    extra={
+                      appliedMessages.has(`${msg.id}-${idx}`) ? (
+                        <span className="text-sm text-green-600 font-medium">✓ 已创建</span>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => {
+                              setEditingTask(task);
+                            }}
+                          >
+                            修改
+                          </Button>
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={async () => {
+                              if (appliedMessages.has(`${msg.id}-${idx}`)) return;
+                              setAppliedMessages(prev => new Set(prev).add(`${msg.id}-${idx}`));
+                              try {
+                                await createTask({
+                                  title: task.title,
+                                  description: task.description,
+                                  priority: task.priority || 'medium',
+                                  dueDate: task.dueDate,
+                                  dueTime: task.dueTime,
+                                  duration: task.duration || 60,
+                                });
+                              } catch (error) {
+                                setAppliedMessages(prev => {
+                                  const next = new Set(prev);
+                                  next.delete(`${msg.id}-${idx}`);
+                                  return next;
+                                });
+                                throw error;
+                              }
+                            }}
+                          >
+                            应用
+                          </Button>
+                        </div>
+                      )
+                    }
+                  >
+                    <div className="text-sm space-y-1">
+                      {task.description && <div className="text-gray-600 dark:text-gray-400">{task.description}</div>}
+                      <div className="flex gap-2 text-xs text-gray-500">
+                        {task.priority && <span>优先级: {task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}</span>}
+                        {task.dueDate && <span>截止: {task.dueDate} {task.dueTime || ''}</span>}
+                        {task.duration && <span>时长: {task.duration}分钟</span>}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         ))}
 
         {isLoading && (
-          <Bubble
-            placement="start"
-            avatar={
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-md">
-                <RobotOutlined />
-              </div>
-            }
-            content={
-              <div>
-                <ThinkingIndicator thinking={streamingThinking} />
-                {pendingToolCalls.length > 0 && (
-                  <div className="mb-2 space-y-1">
-                    {pendingToolCalls.map((tool) => (
-                      <ToolCallCard key={tool.id} toolCall={tool} />
-                    ))}
-                  </div>
-                )}
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <span>正在处理...</span>
-                </div>
-              </div>
-            }
+          <MessageBubble
+            role="assistant"
+            content={streamingContent || "正在处理..."}
+            thinking={streamingThinking}
+            toolCalls={pendingToolCalls}
+            isStreaming={true}
           />
         )}
       </div>

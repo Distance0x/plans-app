@@ -210,29 +210,65 @@ export async function chatAndPlan(
   const draftActions: DraftAction[] = [];
 
   while (iterations < MAX_ITERATIONS) {
-    const response = await client.chat.completions.create({
+    const stream = await client.chat.completions.create({
       model: config.model,
       messages,
       tools,
       tool_choice: 'auto',
-      stream: false,
+      stream: true,
     });
 
-    const choice = response.choices[0];
-    const message = choice.message;
+    let fullContent = '';
+    let toolCalls: any[] = [];
+    let finishReason: string | null = null;
 
-    if (!message.tool_calls || message.tool_calls.length === 0) {
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+
+      if (delta?.content) {
+        fullContent += delta.content;
+        onStream?.({ content: delta.content });
+      }
+
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (!toolCalls[tc.index]) {
+            toolCalls[tc.index] = {
+              id: tc.id || '',
+              type: 'function',
+              function: { name: '', arguments: '' }
+            };
+          }
+          if (tc.function?.name) {
+            toolCalls[tc.index].function.name = tc.function.name;
+          }
+          if (tc.function?.arguments) {
+            toolCalls[tc.index].function.arguments += tc.function.arguments;
+          }
+        }
+      }
+
+      if (chunk.choices[0]?.finish_reason) {
+        finishReason = chunk.choices[0].finish_reason;
+      }
+    }
+
+    if (toolCalls.length === 0) {
       return {
         responseId: randomUUID(),
-        assistantText: message.content || '已完成',
+        assistantText: fullContent || '已完成',
         draftActions,
         toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
       };
     }
 
-    messages.push(message);
+    messages.push({
+      role: 'assistant',
+      content: fullContent || null,
+      tool_calls: toolCalls,
+    });
 
-    for (const toolCall of message.tool_calls) {
+    for (const toolCall of toolCalls) {
       if (toolCall.type !== 'function') continue;
 
       const startTime = Date.now();

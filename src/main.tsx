@@ -4,6 +4,7 @@ import App from './App';
 import FloatingApp from './FloatingApp';
 import TestApp from './TestApp';
 import './styles/globals.css';
+import './styles/markdown.css';
 
 // 临时使用 TestApp 来排查问题
 // 如果 TestApp 能显示，说明问题在 App 组件中
