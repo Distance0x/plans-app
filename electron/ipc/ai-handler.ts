@@ -20,10 +20,17 @@ export function registerAIHandlers() {
           .orderBy(aiMessages.timestamp)
       : [];
 
-    const messages = history.map(msg => ({
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content
-    }));
+    const messages = history.map(msg => {
+      const message: any = {
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      };
+      // 如果是 assistant 消息且有 thinking，添加 reasoning_content
+      if (msg.role === 'assistant' && msg.thinking) {
+        message.reasoning_content = msg.thinking;
+      }
+      return message;
+    });
     messages.push({ role: 'user', content: userText });
 
     const streamId = requestId || randomUUID();
