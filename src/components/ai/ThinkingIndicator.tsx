@@ -48,7 +48,11 @@ export function ThinkingIndicator({ thinking, expanded = false, isStreaming = fa
             color: 'rgba(255,255,255,0.9)',
             fontSize: 12,
             whiteSpace: 'pre-wrap',
-            marginTop: 8
+            wordBreak: 'break-word',
+            maxHeight: '300px',
+            overflowY: 'auto',
+            marginTop: 8,
+            lineHeight: 1.6
           }}>
             {thinking}
           </div>
