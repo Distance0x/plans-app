@@ -13,6 +13,14 @@ interface AIConfig {
   model: string;
 }
 
+interface AIStreamChunk {
+  streamId?: string;
+  sequence?: number;
+  thinking?: string;
+  toolCalls?: any[];
+  content?: string;
+}
+
 export function AgentPanel() {
   const {
     currentSessionId,
@@ -44,6 +52,19 @@ export function AgentPanel() {
   const [inputValue, setInputValue] = useState('');
   const [applyingDraft, setApplyingDraft] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const streamingContentRef = useRef('');
+  const streamBufferRef = useRef('');
+  const streamFlushTimerRef = useRef<number | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
+  const cancelledRequestIdsRef = useRef<Set<string>>(new Set());
+  const activeStreamRef = useRef<{
+    streamId?: string;
+    seenSequences: Set<number>;
+    active: boolean;
+  }>({
+    seenSequences: new Set(),
+    active: false,
+  });
   const [appliedMessages, setAppliedMessages] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('ai-applied-messages');
@@ -52,6 +73,27 @@ export function AgentPanel() {
       return new Set();
     }
   });
+
+  const resetStreamBuffer = () => {
+    streamBufferRef.current = '';
+    if (streamFlushTimerRef.current !== null) {
+      window.clearTimeout(streamFlushTimerRef.current);
+      streamFlushTimerRef.current = null;
+    }
+  };
+
+  const clearStreamingState = (requestId?: string) => {
+    if (requestId && activeRequestIdRef.current !== requestId) return;
+
+    setLoading(false);
+    activeRequestIdRef.current = null;
+    activeStreamRef.current.active = false;
+    streamingContentRef.current = '';
+    setStreamingThinking('');
+    setPendingToolCalls([]);
+    setStreamingContent('');
+    resetStreamBuffer();
+  };
   const [editingTask, setEditingTask] = useState<{
     title: string;
     description?: string;
@@ -69,7 +111,43 @@ export function AgentPanel() {
     loadConfig();
     loadHistoryMessages();
 
-    const handleStream = (chunk: { thinking?: string; toolCalls?: any[]; content?: string }) => {
+    const flushStreamingBuffer = () => {
+      const nextContent = streamBufferRef.current;
+      if (!nextContent) return;
+
+      streamBufferRef.current = '';
+      setStreamingContent(prev => {
+        const nextValue = prev + nextContent;
+        streamingContentRef.current = nextValue;
+        return nextValue;
+      });
+    };
+
+    const enqueueStreamingContent = (content: string) => {
+      streamBufferRef.current += content;
+      if (streamFlushTimerRef.current !== null) return;
+
+      streamFlushTimerRef.current = window.setTimeout(() => {
+        streamFlushTimerRef.current = null;
+        flushStreamingBuffer();
+      }, 32);
+    };
+
+    const handleStream = (chunk: AIStreamChunk) => {
+      if (!activeStreamRef.current.active) return;
+
+      const hasStreamId = typeof chunk.streamId === 'string' && chunk.streamId.length > 0;
+      if (hasStreamId && chunk.streamId !== activeStreamRef.current.streamId) {
+        return;
+      }
+
+      if (hasStreamId && typeof chunk.sequence === 'number') {
+        if (activeStreamRef.current.seenSequences.has(chunk.sequence)) {
+          return;
+        }
+        activeStreamRef.current.seenSequences.add(chunk.sequence);
+      }
+
       if (chunk.thinking) {
         setStreamingThinking(chunk.thinking);
       }
@@ -77,7 +155,7 @@ export function AgentPanel() {
         setPendingToolCalls(chunk.toolCalls);
       }
       if (chunk.content) {
-        setStreamingContent(prev => prev + chunk.content);
+        enqueueStreamingContent(chunk.content);
       }
     };
 
@@ -85,6 +163,7 @@ export function AgentPanel() {
 
     return () => {
       window.electron.off('ai:stream', handleStream);
+      resetStreamBuffer();
     };
   }, [setStreamingThinking, setPendingToolCalls]);
 
@@ -168,9 +247,38 @@ export function AgentPanel() {
     }
   };
 
+  const handleCancel = () => {
+    const requestId = activeRequestIdRef.current;
+    if (!requestId) return;
+
+    cancelledRequestIdsRef.current.add(requestId);
+    activeStreamRef.current.active = false;
+
+    const partialContent = streamingContentRef.current + streamBufferRef.current;
+    const assistantContent = partialContent.trim()
+      ? `${partialContent}\n\n（已中止）`
+      : '已中止';
+    const toolCallsSnapshot = pendingToolCalls.length > 0 ? [...pendingToolCalls] : undefined;
+    const thinkingSnapshot = streamingThinking || undefined;
+
+    clearStreamingState(requestId);
+    addMessage({
+      id: `msg_${Date.now()}`,
+      role: 'assistant',
+      content: assistantContent,
+      thinking: thinkingSnapshot,
+      toolCalls: toolCallsSnapshot,
+      timestamp: Date.now(),
+    });
+
+    window.electron.ai.cancelChat(requestId)
+      .catch(error => console.error('Failed to cancel AI request:', error));
+  };
+
   const handleSend = async (message: string) => {
     if (!message.trim() || isLoading) return;
 
+    const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const userMessage = {
       id: `msg_${Date.now()}`,
       role: 'user' as const,
@@ -183,15 +291,27 @@ export function AgentPanel() {
     setStreamingThinking('');
     setPendingToolCalls([]);
     setStreamingContent('');
+    streamingContentRef.current = '';
+    resetStreamBuffer();
+    activeRequestIdRef.current = requestId;
+    cancelledRequestIdsRef.current.delete(requestId);
+
+    activeStreamRef.current = {
+      streamId: requestId,
+      seenSequences: new Set(),
+      active: true,
+    };
 
     try {
-      const response = await window.electron.ai.chat(message, currentSessionId);
+      const response = await window.electron.ai.chat(message, currentSessionId, requestId);
 
-      // 关键：先设置 loading 为 false，让流式消息消失
-      setLoading(false);
-      setStreamingThinking('');
-      setPendingToolCalls([]);
-      setStreamingContent('');
+      if (response.cancelled || cancelledRequestIdsRef.current.has(requestId)) {
+        cancelledRequestIdsRef.current.delete(requestId);
+        clearStreamingState(requestId);
+        return;
+      }
+
+      clearStreamingState(requestId);
 
       // 然后再添加最终消息到历史
       // 使用后端返回的 assistantText，不使用前端累积的 streamingContent
@@ -206,10 +326,13 @@ export function AgentPanel() {
       });
       setDraftActions(response.draftActions);
     } catch (error) {
-      setLoading(false);
-      setStreamingThinking('');
-      setPendingToolCalls([]);
-      setStreamingContent('');
+      if (cancelledRequestIdsRef.current.has(requestId)) {
+        cancelledRequestIdsRef.current.delete(requestId);
+        clearStreamingState(requestId);
+        return;
+      }
+
+      clearStreamingState(requestId);
 
       addMessage({
         id: `msg_${Date.now()}`,
@@ -571,8 +694,9 @@ export function AgentPanel() {
           value={inputValue}
           onChange={setInputValue}
           onSubmit={handleSend}
+          onCancel={handleCancel}
           loading={isLoading}
-          disabled={isLoading}
+          readOnly={isLoading}
           styles={{
             input: {
               borderRadius: 12,

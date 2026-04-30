@@ -6,6 +6,7 @@ import { saveUserProfileSettings } from './user-profile-update';
 
 interface ChatRequest {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  signal?: AbortSignal;
 }
 
 interface ChatResponse {
@@ -28,6 +29,14 @@ interface ToolCallInfo {
 interface DraftAction {
   type: 'create_task' | 'update_task' | 'schedule_task' | 'update_profile';
   payload: unknown;
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (!signal?.aborted) return;
+
+  const error = new Error('AI request cancelled');
+  error.name = 'AbortError';
+  throw error;
 }
 
 const tools: OpenAI.Chat.ChatCompletionTool[] = [
@@ -182,18 +191,21 @@ export async function chatAndPlan(
   if (!config) {
     throw new Error('AI configuration not set');
   }
+  throwIfAborted(request.signal);
 
   const client = new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseURL,
-    timeout: 15000,
+    timeout: 60000,
   });
 
   const now = new Date();
   const currentDate = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const currentTime = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
+  throwIfAborted(request.signal);
   const profileContext = await getUserProfileContext();
+  throwIfAborted(request.signal);
   const systemPrompt = buildAISystemPrompt(profileContext, currentDate, currentTime);
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -210,19 +222,22 @@ export async function chatAndPlan(
   const draftActions: DraftAction[] = [];
 
   while (iterations < MAX_ITERATIONS) {
+    throwIfAborted(request.signal);
     const stream = await client.chat.completions.create({
       model: config.model,
       messages,
       tools,
       tool_choice: 'auto',
       stream: true,
+    }, {
+      signal: request.signal,
     });
 
     let fullContent = '';
     let toolCalls: any[] = [];
-    let finishReason: string | null = null;
 
     for await (const chunk of stream) {
+      throwIfAborted(request.signal);
       const delta = chunk.choices[0]?.delta;
 
       if (delta?.content) {
@@ -247,13 +262,10 @@ export async function chatAndPlan(
           }
         }
       }
-
-      if (chunk.choices[0]?.finish_reason) {
-        finishReason = chunk.choices[0].finish_reason;
-      }
     }
 
     if (toolCalls.length === 0) {
+      throwIfAborted(request.signal);
       return {
         responseId: randomUUID(),
         assistantText: fullContent || '已完成',
@@ -269,6 +281,7 @@ export async function chatAndPlan(
     });
 
     for (const toolCall of toolCalls) {
+      throwIfAborted(request.signal);
       if (toolCall.type !== 'function') continue;
 
       const startTime = Date.now();

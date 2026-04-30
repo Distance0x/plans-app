@@ -95,7 +95,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   ai: {
-    chat: (userText: string, threadId?: string) => ipcRenderer.invoke('ai:chat', userText, threadId),
+    chat: (userText: string, threadId?: string, requestId?: string) => ipcRenderer.invoke('ai:chat', userText, threadId, requestId),
+    cancelChat: (requestId: string) => ipcRenderer.invoke('ai:chat:cancel', requestId),
     testConnection: () => ipcRenderer.invoke('ai:testConnection'),
     saveConfig: (config: { baseURL: string; apiKey: string; model: string }) => ipcRenderer.invoke('ai:saveConfig', config),
     loadConfig: () => ipcRenderer.invoke('ai:loadConfig'),

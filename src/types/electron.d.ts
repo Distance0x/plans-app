@@ -74,7 +74,7 @@ export interface ElectronAPI {
     openAttachment: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
   };
   ai: {
-    chat: (userText: string, sessionId?: string) => Promise<{
+    chat: (userText: string, sessionId?: string, requestId?: string) => Promise<{
       responseId: string;
       assistantText: string;
       draftActions: Array<{
@@ -88,6 +88,11 @@ export interface ElectronAPI {
         arguments: string;
         status: 'pending' | 'completed' | 'failed';
       }>;
+      cancelled?: boolean;
+    }>;
+    cancelChat: (requestId: string) => Promise<{
+      success: boolean;
+      reason?: string;
     }>;
     testConnection: () => Promise<{ success: boolean }>;
     saveConfig: (config: { baseURL: string; apiKey: string; model: string }) => Promise<{ success: boolean }>;

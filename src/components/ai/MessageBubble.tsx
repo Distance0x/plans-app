@@ -9,7 +9,14 @@ interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
-  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: string;
+    status: 'pending' | 'completed' | 'failed';
+    startTime?: number;
+    endTime?: number;
+  }>;
   timestamp?: number;
   isStreaming?: boolean;
   onCopy?: () => void;
@@ -76,9 +83,13 @@ export function MessageBubble({
               <p className="text-sm whitespace-pre-wrap">{content}</p>
             ) : (
               <div className="relative">
-                <MarkdownRenderer content={content} />
-                {isStreaming && (
-                  <span className="inline-block w-0.5 h-4 bg-gray-900 dark:bg-gray-100 ml-1 animate-pulse" />
+                {isStreaming ? (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100">
+                    {content}
+                    <span className="inline-block w-0.5 h-4 bg-gray-900 dark:bg-gray-100 ml-1 animate-pulse align-text-bottom" />
+                  </p>
+                ) : (
+                  <MarkdownRenderer content={content} />
                 )}
               </div>
             )}

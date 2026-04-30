@@ -5,9 +5,12 @@ import { behaviorTracker } from '../services/behavior-tracker';
 import { getDatabase } from '../database/db';
 import { aiMessages } from '../database/schema';
 import { eq } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+
+const activeAIRequests = new Map<string, AbortController>();
 
 export function registerAIHandlers() {
-  ipcMain.handle('ai:chat', async (event, userText: string, sessionId?: string) => {
+  ipcMain.handle('ai:chat', async (event, userText: string, sessionId?: string, requestId?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
 
     const db = await getDatabase();
@@ -23,14 +26,54 @@ export function registerAIHandlers() {
     }));
     messages.push({ role: 'user', content: userText });
 
-    const response = await chatAndPlan({ messages }, (chunk) => {
-      win?.webContents.send('ai:stream', chunk);
-    });
+    const streamId = requestId || randomUUID();
+    const abortController = new AbortController();
+    let sequence = 0;
+    activeAIRequests.set(streamId, abortController);
 
-    const tasksGenerated = response.draftActions.filter(a => a.type === 'create_task').length;
-    await behaviorTracker.trackAIConversation(tasksGenerated);
+    try {
+      const response = await chatAndPlan({ messages, signal: abortController.signal }, (chunk) => {
+        if (abortController.signal.aborted) return;
 
-    return response;
+        win?.webContents.send('ai:stream', {
+          ...chunk,
+          streamId,
+          sequence: sequence++,
+        });
+      });
+
+      const tasksGenerated = response.draftActions.filter(a => a.type === 'create_task').length;
+      await behaviorTracker.trackAIConversation(tasksGenerated);
+
+      return response;
+    } catch (error: any) {
+      if (abortController.signal.aborted || error?.name === 'AbortError') {
+        return {
+          responseId: streamId,
+          assistantText: '',
+          draftActions: [],
+          cancelled: true,
+        };
+      }
+
+      throw error;
+    } finally {
+      const activeController = activeAIRequests.get(streamId);
+      if (activeController === abortController) {
+        activeAIRequests.delete(streamId);
+      }
+    }
+  });
+
+  ipcMain.handle('ai:chat:cancel', async (_event, requestId: string) => {
+    const controller = activeAIRequests.get(requestId);
+    if (!controller) {
+      return { success: false, reason: 'not_found' };
+    }
+
+    controller.abort();
+    activeAIRequests.delete(requestId);
+    return { success: true };
   });
 
   ipcMain.handle('ai:testConnection', async () => {
